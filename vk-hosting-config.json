@@ -1,9 +1,0 @@
-{
-    "app_id": 54729099,
-    "endpoints": {
-        "mobile": "https://vk-apps.com/app54729099/",
-        "web": "https://vk-apps.com/app54729099/"
-    },
-    "static_path": "dist",
-    "default_locale": "ru"
-}
