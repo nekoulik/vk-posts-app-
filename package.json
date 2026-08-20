@@ -10,6 +10,7 @@
     "dependencies": {
         "@vkontakte/vk-bridge": "^2.15.12",
         "@vkontakte/vkui": "^6.0.0",
+        "date-fns": "^4.4.0",
         "react": "^18.2.0",
         "react-dom": "^18.2.0"
     },
