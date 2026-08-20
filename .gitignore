@@ -1,0 +1,6 @@
+.env
+*.ps1
+dist.zip
+node_modules/
+dist/
+.DS_Store
