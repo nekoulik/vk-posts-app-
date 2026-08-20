@@ -1,0 +1,10 @@
+{
+    "name": "Посты для группы",
+    "description": "Создавайте красивые посты и публикуйте их в сообщество",
+    "icon": "/icon.png",
+    "screenshots": [],
+    "launch_params": {
+        "viewport_width": 630,
+        "viewport_height": 600
+    }
+}
