@@ -18,32 +18,20 @@ export default function App() {
   const [groupId, setGroupId] = useState('-240736389');
 
   useEffect(() => {
-    // Инициализация VK Bridge
     vkBridge.send('VKWebAppInit')
       .then(() => {
         console.log('VK Bridge initialized');
-        // Запрашиваем права на доступ к группам
-        return vkBridge.send('VKWebAppAllowGroupsAccess', { group_id: 0 });
-      })
-      .then(() => {
-        console.log('Groups access granted');
-        // Получаем информацию о пользователе
-        return vkBridge.send('VKWebAppGetUserInfo');
-      })
-      .then((user) => {
-        console.log('User info:', user);
         setFetching(false);
       })
       .catch((error) => {
         console.error('Init error:', error);
-        // Даже если ошибка — всё равно показываем приложение
         setFetching(false);
       });
   }, []);
 
   const publishPost = async () => {
     if (!post.text.trim()) {
-      setSnackbar('️ Введите текст поста');
+      setSnackbar('⚠️ Введите текст поста');
       return;
     }
 
@@ -66,7 +54,7 @@ export default function App() {
       setPost({ text: '' });
     } catch (e) {
       console.error('Full error:', e);
-      const errorMsg = e.error_msg || e.message || JSON.stringify(e);
+      const errorMsg = e.error_data?.error_reason || e.error_msg || 'Неизвестная ошибка';
       setSnackbar('❌ Ошибка: ' + errorMsg);
     }
   };
@@ -97,7 +85,7 @@ export default function App() {
             style={{ minHeight: 40 }}
           />
           <div style={{ fontSize: '12px', color: '#818C99', marginTop: '4px' }}>
-            ID группы с минусом (например: -240736389)
+            ID группы с минусом
           </div>
         </Div>
       </Group>
@@ -117,10 +105,7 @@ export default function App() {
       </Group>
 
       {snackbar && (
-        <Snackbar
-          onClose={() => setSnackbar(null)}
-          duration={4000}
-        >
+        <Snackbar onClose={() => setSnackbar(null)} duration={4000}>
           {snackbar}
         </Snackbar>
       )}
