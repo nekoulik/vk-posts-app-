@@ -1,50 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
 import vkBridge from '@vkontakte/vk-bridge';
-import { WORKER_URL } from './config';
 
 const SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
 
 const TEMPLATES = [
-  {
-    id: 'news',
-    name: '📢 Новость',
-    text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно'
-  },
-  {
-    id: 'promo',
-    name: '🎉 Акция',
-    text: '🎉 АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки'
-  },
-  {
-    id: 'question',
-    name: '❓ Вопрос',
-    text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос'
-  },
-  {
-    id: 'article',
-    name: '📝 Статья',
-    text: '{заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья'
-  },
-  {
-    id: 'product',
-    name: '🛍️ Товар',
-    text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин'
-  },
-  {
-    id: 'event',
-    name: '📅 Событие',
-    text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча'
-  },
-  {
-    id: 'quote',
-    name: '💬 Цитата',
-    text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость'
-  },
-  {
-    id: 'contest',
-    name: '🏆 Конкурс',
-    text: ' КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш'
-  }
+  { id: 'news', name: ' Новость', text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
+  { id: 'promo', name: '🎉 Акция', text: ' АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
+  { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
+  { id: 'article', name: '📝 Статья', text: '{заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
+  { id: 'product', name: '🛍️ Товар', text: '️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
+  { id: 'event', name: ' Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
+  { id: 'quote', name: '💬 Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
+  { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
 ];
 
 const POPULAR_TAGS = [
@@ -89,7 +56,6 @@ export default function App() {
     } catch (e) {
       console.error('Ошибка загрузки черновика:', e);
     }
-
     vkBridge.send('VKWebAppInit').catch(console.error);
   }, []);
 
@@ -101,12 +67,9 @@ export default function App() {
         groupId: groupId,
         tags: tags,
         images: images.map(img => ({ 
-          tempId: img.tempId,
-          url: img.url,
-          id: img.id,
-          owner_id: img.owner_id,
-          access_key: img.access_key,
-          uploaded: img.uploaded
+          tempId: img.tempId, url: img.url,
+          id: img.id, owner_id: img.owner_id,
+          access_key: img.access_key, uploaded: img.uploaded
         })),
         savedAt: new Date().toISOString()
       };
@@ -114,8 +77,7 @@ export default function App() {
     }
   }, [post.text, groupId, tags, images]);
 
-  // === ФУНКЦИИ ДЛЯ ИЗОБРАЖЕНИЙ (через Worker) ===
-
+  // === ЗАГРУЗКА ФОТО ЧЕРЕЗ VK BRIDGE ===
   const handleFileSelect = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -131,26 +93,9 @@ export default function App() {
     try {
       const cleanGroupId = groupId.replace('-', '');
 
-      // 1. Получаем URL для загрузки через Worker
-      const getServerUrl = `${WORKER_URL}?url=${encodeURIComponent(
-        `https://api.vk.com/method/photos.getWallUploadServer?group_id=${cleanGroupId}&access_token=${SERVICE_TOKEN}&v=5.131`
-      )}`;
-
-      const serverResponse = await fetch(getServerUrl);
-      const serverData = await serverResponse.json();
-      
-      console.log('Upload server:', serverData);
-      
-      if (serverData.error) {
-        throw new Error(serverData.error.error_msg || 'Не удалось получить сервер загрузки');
-      }
-      
-      const uploadUrl = serverData.response.upload_url;
-
-      // 2. Загружаем каждое изображение
       for (const file of files) {
         if (file.size > 5 * 1024 * 1024) {
-          setSnackbar(`⚠️ Файл "${file.name}" слишком большой (макс. 5MB)`);
+          setSnackbar(`️ Файл "${file.name}" слишком большой (макс. 5MB)`);
           setTimeout(() => setSnackbar(null), 3000);
           continue;
         }
@@ -159,13 +104,23 @@ export default function App() {
         const tempId = Date.now() + Math.random();
         
         setImages(prev => [...prev, { 
-          tempId, 
-          url: previewUrl, 
-          uploading: true 
+          tempId, url: previewUrl, uploading: true 
         }]);
 
         try {
-          // Загружаем на сервер VK напрямую (без Worker, т.к. это upload URL)
+          // 1. Получаем URL для загрузки через VK Bridge
+          const uploadServer = await vkBridge.send('VKWebAppCallAPIMethod', {
+            method: 'photos.getWallUploadServer',
+            params: {
+              group_id: cleanGroupId,
+              access_token: SERVICE_TOKEN
+            }
+          });
+
+          const uploadUrl = uploadServer.upload_url;
+          console.log('Upload URL:', uploadUrl);
+
+          // 2. Загружаем файл напрямую на upload URL
           const formData = new FormData();
           formData.append('photo', file);
           
@@ -177,25 +132,26 @@ export default function App() {
           const uploadData = await uploadResponse.json();
           console.log('Upload data:', uploadData);
 
-          // 3. Сохраняем фото через Worker
-          const saveUrl = `${WORKER_URL}?url=${encodeURIComponent(
-            `https://api.vk.com/method/photos.saveWallPhoto?group_id=${cleanGroupId}&photo=${uploadData.photo}&server=${uploadData.server}&hash=${uploadData.hash}&access_token=${SERVICE_TOKEN}&v=5.131`
-          )}`;
+          // 3. Сохраняем фото через VK Bridge
+          const saved = await vkBridge.send('VKWebAppCallAPIMethod', {
+            method: 'photos.saveWallPhoto',
+            params: {
+              group_id: cleanGroupId,
+              photo: uploadData.photo,
+              server: uploadData.server,
+              hash: uploadData.hash,
+              access_token: SERVICE_TOKEN
+            }
+          });
 
-          const saveResponse = await fetch(saveUrl);
-          const saveData = await saveResponse.json();
-          console.log('Save data:', saveData);
-          
-          if (saveData.error) {
-            throw new Error(saveData.error.error_msg);
-          }
+          console.log('Saved photo:', saved);
 
           setImages(prev => prev.map(img => 
             img.tempId === tempId ? {
               ...img,
-              id: saveData.response[0].id,
-              owner_id: saveData.response[0].owner_id,
-              access_key: saveData.response[0].access_key,
+              id: saved[0].id,
+              owner_id: saved[0].owner_id,
+              access_key: saved[0].access_key,
               uploading: false,
               uploaded: true
             } : img
@@ -203,8 +159,9 @@ export default function App() {
 
         } catch (uploadError) {
           console.error('Ошибка загрузки фото:', uploadError);
-          setSnackbar(`❌ Не удалось загрузить "${file.name}"`);
-          setTimeout(() => setSnackbar(null), 3000);
+          const errorMsg = uploadError.error_data?.error_reason || uploadError.error_msg || uploadError.message;
+          setSnackbar(`❌ Не удалось загрузить "${file.name}": ${errorMsg}`);
+          setTimeout(() => setSnackbar(null), 4000);
           setImages(prev => prev.filter(img => img.tempId !== tempId));
         }
       }
@@ -229,8 +186,7 @@ export default function App() {
     setImages(images.filter((_, i) => i !== index));
   };
 
-  // === ФУНКЦИИ ДЛЯ ТЕГОВ ===
-
+  // === ТЕГИ ===
   const addTag = (tag) => {
     const cleanTag = tag.trim().toLowerCase().replace(/^#/, '');
     if (!cleanTag) return;
@@ -257,13 +213,10 @@ export default function App() {
   const getFinalText = () => {
     let text = post.text.trim();
     if (tags.length > 0) {
-      const tagsString = tags.map(t => `#${t}`).join(' ');
-      text += '\n\n' + tagsString;
+      text += '\n\n' + tags.map(t => `#${t}`).join(' ');
     }
     return text;
   };
-
-  // === ОСТАЛЬНЫЕ ФУНКЦИИ ===
 
   const loadTemplate = (template) => {
     setPost({ text: template.text });
@@ -275,11 +228,8 @@ export default function App() {
 
   const clearAll = () => {
     images.forEach(img => {
-      if (img.url && img.url.startsWith('blob:')) {
-        URL.revokeObjectURL(img.url);
-      }
+      if (img.url && img.url.startsWith('blob:')) URL.revokeObjectURL(img.url);
     });
-    
     setPost({ text: '' });
     setSelectedTemplate(null);
     setTags([]);
@@ -304,7 +254,7 @@ export default function App() {
           if (draft.images) {
             setImages(draft.images.map(img => ({ ...img, uploading: false })));
           }
-          setSnackbar('♻️ Черновик восстановлен');
+          setSnackbar('️ Черновик восстановлен');
           setTimeout(() => setSnackbar(null), 3000);
         }
       }
@@ -367,9 +317,7 @@ export default function App() {
       console.log('Post published:', response);
       
       images.forEach(img => {
-        if (img.url && img.url.startsWith('blob:')) {
-          URL.revokeObjectURL(img.url);
-        }
+        if (img.url && img.url.startsWith('blob:')) URL.revokeObjectURL(img.url);
       });
       
       localStorage.removeItem(DRAFT_KEY);
@@ -397,117 +345,54 @@ export default function App() {
       maxWidth: '800px',
       margin: '0 auto'
     }}>
-      <h2 style={{ 
-        marginBottom: '20px', 
-        fontSize: '28px',
-        fontWeight: 'bold',
-        color: '#000'
-      }}>
+      <h2 style={{ marginBottom: '20px', fontSize: '28px', fontWeight: 'bold', color: '#000' }}>
         Редактор поста
       </h2>
 
       {draftLoaded && (
         <div style={{ 
-          marginBottom: '15px', 
-          padding: '12px 15px', 
-          background: '#fff3cd',
-          border: '1px solid #ffc107',
-          borderRadius: '8px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontSize: '14px'
+          marginBottom: '15px', padding: '12px 15px', 
+          background: '#fff3cd', border: '1px solid #ffc107',
+          borderRadius: '8px', display: 'flex',
+          justifyContent: 'space-between', alignItems: 'center', fontSize: '14px'
         }}>
-          <span style={{ color: '#856404', fontWeight: '500' }}>
-             Есть сохранённый черновик
-          </span>
-          <button
-            onClick={restoreDraft}
-            style={{
-              padding: '8px 16px',
-              background: '#ffc107',
-              color: '#856404',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '14px',
-              cursor: 'pointer',
-              fontWeight: '600'
-            }}
-          >
-            ♻️ Восстановить
-          </button>
+          <span style={{ color: '#856404', fontWeight: '500' }}>💾 Есть сохранённый черновик</span>
+          <button onClick={restoreDraft} style={{
+            padding: '8px 16px', background: '#ffc107', color: '#856404',
+            border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', fontWeight: '600'
+          }}>♻️ Восстановить</button>
         </div>
       )}
 
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-        <button
-          onClick={() => setShowTemplates(!showTemplates)}
-          style={{
-            padding: '10px 20px',
-            background: '#6c5ce7',
-            color: 'white',
-            border: 'none',
-            borderRadius: '8px',
-            fontSize: '15px',
-            cursor: 'pointer',
-            fontWeight: '500'
-          }}
-        >
+        <button onClick={() => setShowTemplates(!showTemplates)} style={{
+          padding: '10px 20px', background: '#6c5ce7', color: 'white',
+          border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500'
+        }}>
           {showTemplates ? '🙈 Скрыть шаблоны' : '📋 Выбрать шаблон'}
         </button>
         
         {(post.text || draftLoaded || tags.length > 0 || images.length > 0) && (
-          <button
-            onClick={clearAll}
-            style={{
-              padding: '10px 20px',
-              background: '#e74c3c',
-              color: 'white',
-              border: 'none',
-              borderRadius: '8px',
-              fontSize: '15px',
-              cursor: 'pointer',
-              fontWeight: '500'
-            }}
-          >
-            🗑️ Очистить всё
-          </button>
+          <button onClick={clearAll} style={{
+            padding: '10px 20px', background: '#e74c3c', color: 'white',
+            border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500'
+          }}>🗑️ Очистить всё</button>
         )}
       </div>
 
       {showTemplates && (
-        <div style={{ 
-          marginBottom: '20px', 
-          padding: '20px', 
-          background: '#f8f9fa',
-          borderRadius: '12px',
-          border: '1px solid #e0e0e0'
-        }}>
-          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>
-            📋 Выберите шаблон:
-          </h3>
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', 
-            gap: '12px' 
-          }}>
+        <div style={{ marginBottom: '20px', padding: '20px', background: '#f8f9fa', borderRadius: '12px', border: '1px solid #e0e0e0' }}>
+          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>📋 Выберите шаблон:</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
             {TEMPLATES.map((template) => (
-              <button
-                key={template.id}
-                onClick={() => loadTemplate(template)}
-                style={{
-                  padding: '15px',
-                  background: selectedTemplate?.id === template.id ? '#6c5ce7' : 'white',
-                  color: selectedTemplate?.id === template.id ? 'white' : '#333',
-                  border: `2px solid ${selectedTemplate?.id === template.id ? '#6c5ce7' : '#e0e0e0'}`,
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  cursor: 'pointer',
-                  textAlign: 'left',
-                  transition: 'all 0.2s',
-                  fontWeight: selectedTemplate?.id === template.id ? '600' : '400'
-                }}
-              >
+              <button key={template.id} onClick={() => loadTemplate(template)} style={{
+                padding: '15px',
+                background: selectedTemplate?.id === template.id ? '#6c5ce7' : 'white',
+                color: selectedTemplate?.id === template.id ? 'white' : '#333',
+                border: `2px solid ${selectedTemplate?.id === template.id ? '#6c5ce7' : '#e0e0e0'}`,
+                borderRadius: '8px', fontSize: '14px', cursor: 'pointer', textAlign: 'left',
+                fontWeight: selectedTemplate?.id === template.id ? '600' : '400'
+              }}>
                 {template.name}
               </button>
             ))}
@@ -517,32 +402,15 @@ export default function App() {
 
       {selectedTemplate && !showTemplates && (
         <div style={{ 
-          marginBottom: '15px', 
-          padding: '12px', 
-          background: '#e8f5e9',
-          borderRadius: '8px',
-          border: '1px solid #4caf50',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
+          marginBottom: '15px', padding: '12px', background: '#e8f5e9',
+          borderRadius: '8px', border: '1px solid #4caf50',
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center'
         }}>
-          <span style={{ fontWeight: '500', color: '#2e7d32' }}>
-            ✅ Активен: {selectedTemplate.name}
-          </span>
-          <button
-            onClick={() => setSelectedTemplate(null)}
-            style={{
-              padding: '6px 12px',
-              background: 'transparent',
-              color: '#2e7d32',
-              border: '1px solid #2e7d32',
-              borderRadius: '6px',
-              fontSize: '13px',
-              cursor: 'pointer'
-            }}
-          >
-            Убрать
-          </button>
+          <span style={{ fontWeight: '500', color: '#2e7d32' }}>✅ Активен: {selectedTemplate.name}</span>
+          <button onClick={() => setSelectedTemplate(null)} style={{
+            padding: '6px 12px', background: 'transparent', color: '#2e7d32',
+            border: '1px solid #2e7d32', borderRadius: '6px', fontSize: '13px', cursor: 'pointer'
+          }}>Убрать</button>
         </div>
       )}
 
@@ -552,36 +420,19 @@ export default function App() {
           value={post.text}
           onChange={(e) => setPost(p => ({ ...p, text: e.target.value }))}
           style={{ 
-            width: '100%', 
-            minHeight: '200px', 
-            padding: '15px',
-            fontSize: '15px',
-            border: '1px solid #dfe1e5',
-            borderRadius: '8px',
-            resize: 'vertical',
-            boxSizing: 'border-box',
-            fontFamily: 'inherit',
-            lineHeight: '1.6'
+            width: '100%', minHeight: '200px', padding: '15px',
+            fontSize: '15px', border: '1px solid #dfe1e5',
+            borderRadius: '8px', resize: 'vertical', boxSizing: 'border-box',
+            fontFamily: 'inherit', lineHeight: '1.6'
           }}
         />
-        <div style={{ 
-          fontSize: '13px', 
-          color: '#818C99', 
-          marginTop: '8px',
-          textAlign: 'right'
-        }}>
-          Символов: {post.text.length} {post.text.trim() && '• 💾 автосохранено'}
+        <div style={{ fontSize: '13px', color: '#818C99', marginTop: '8px', textAlign: 'right' }}>
+          Символов: {post.text.length} {post.text.trim() && '•  автосохранено'}
         </div>
       </div>
 
       {/* === БЛОК ЗАГРУЗКИ ИЗОБРАЖЕНИЙ === */}
-      <div style={{ 
-        marginBottom: '20px', 
-        padding: '15px', 
-        background: '#f8f9fa',
-        borderRadius: '12px',
-        border: '1px solid #e0e0e0'
-      }}>
+      <div style={{ marginBottom: '20px', padding: '15px', background: '#f8f9fa', borderRadius: '12px', border: '1px solid #e0e0e0' }}>
         <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#333' }}>
           🖼️ Изображения ({images.length}/10)
         </h3>
@@ -597,110 +448,55 @@ export default function App() {
             style={{ display: 'none' }}
             id="image-upload"
           />
-          <label
-            htmlFor="image-upload"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '8px',
-              padding: '10px 20px',
-              background: images.length >= 10 ? '#a8b2c1' : uploading ? '#f0ad4e' : '#6c5ce7',
-              color: 'white',
-              borderRadius: '8px',
-              fontSize: '15px',
-              cursor: images.length >= 10 ? 'not-allowed' : 'pointer',
-              fontWeight: '500',
-              transition: 'background 0.2s'
-            }}
-          >
+          <label htmlFor="image-upload" style={{
+            display: 'inline-flex', alignItems: 'center', gap: '8px',
+            padding: '10px 20px',
+            background: images.length >= 10 ? '#a8b2c1' : uploading ? '#f0ad4e' : '#6c5ce7',
+            color: 'white', borderRadius: '8px', fontSize: '15px',
+            cursor: images.length >= 10 ? 'not-allowed' : 'pointer',
+            fontWeight: '500', transition: 'background 0.2s'
+          }}>
             {uploading ? '⏳ Загрузка...' : images.length >= 10 ? '📁 Максимум фото' : '📁 Выбрать фото'}
           </label>
-          <span style={{ 
-            marginLeft: '12px', 
-            fontSize: '13px', 
-            color: '#818C99' 
-          }}>
+          <span style={{ marginLeft: '12px', fontSize: '13px', color: '#818C99' }}>
             (JPG, PNG, GIF до 5MB)
           </span>
         </div>
 
         {images.length > 0 && (
-          <div style={{ 
-            display: 'grid', 
-            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', 
-            gap: '12px' 
-          }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '12px' }}>
             {images.map((img, index) => (
-              <div
-                key={img.tempId || img.id}
-                style={{
-                  position: 'relative',
-                  borderRadius: '8px',
-                  overflow: 'hidden',
-                  border: '2px solid',
-                  borderColor: img.uploading ? '#f0ad4e' : img.uploaded ? '#4CAF50' : '#e74c3c',
-                  aspectRatio: '1',
-                  background: '#000'
-                }}
-              >
-                <img
-                  src={img.url}
-                  alt={`Upload ${index}`}
-                  style={{
-                    width: '100%',
-                    height: '100%',
-                    objectFit: 'cover',
-                    opacity: img.uploading ? 0.6 : 1
-                  }}
-                />
+              <div key={img.tempId || img.id} style={{
+                position: 'relative', borderRadius: '8px', overflow: 'hidden',
+                border: '2px solid',
+                borderColor: img.uploading ? '#f0ad4e' : img.uploaded ? '#4CAF50' : '#e74c3c',
+                aspectRatio: '1', background: '#000'
+              }}>
+                <img src={img.url} alt={`Upload ${index}`} style={{
+                  width: '100%', height: '100%', objectFit: 'cover',
+                  opacity: img.uploading ? 0.6 : 1
+                }} />
                 
                 {img.uploading && (
                   <div style={{
-                    position: 'absolute',
-                    top: '50%',
-                    left: '50%',
+                    position: 'absolute', top: '50%', left: '50%',
                     transform: 'translate(-50%, -50%)',
-                    color: 'white',
-                    fontSize: '24px',
-                    fontWeight: 'bold'
-                  }}>
-                    ⏳
-                  </div>
+                    color: 'white', fontSize: '24px', fontWeight: 'bold'
+                  }}></div>
                 )}
 
-                <button
-                  onClick={() => removeImage(index)}
-                  style={{
-                    position: 'absolute',
-                    top: '5px',
-                    right: '5px',
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    background: 'rgba(231, 76, 60, 0.9)',
-                    color: 'white',
-                    border: 'none',
-                    fontSize: '16px',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontWeight: 'bold'
-                  }}
-                >
-                  ×
-                </button>
+                <button onClick={() => removeImage(index)} style={{
+                  position: 'absolute', top: '5px', right: '5px',
+                  width: '24px', height: '24px', borderRadius: '50%',
+                  background: 'rgba(231, 76, 60, 0.9)', color: 'white',
+                  border: 'none', fontSize: '16px', cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 'bold'
+                }}>×</button>
 
                 <div style={{
-                  position: 'absolute',
-                  bottom: '0',
-                  left: '0',
-                  right: '0',
-                  padding: '4px 8px',
-                  background: 'rgba(0,0,0,0.7)',
-                  color: 'white',
-                  fontSize: '11px',
-                  textAlign: 'center'
+                  position: 'absolute', bottom: '0', left: '0', right: '0',
+                  padding: '4px 8px', background: 'rgba(0,0,0,0.7)',
+                  color: 'white', fontSize: '11px', textAlign: 'center'
                 }}>
                   {img.uploading ? 'Загрузка...' : img.uploaded ? '✓ Загружено' : '✗ Ошибка'}
                 </div>
@@ -711,12 +507,8 @@ export default function App() {
 
         {images.length === 0 && (
           <div style={{ 
-            fontSize: '13px', 
-            color: '#818C99',
-            textAlign: 'center',
-            padding: '20px',
-            border: '2px dashed #e0e0e0',
-            borderRadius: '8px'
+            fontSize: '13px', color: '#818C99', textAlign: 'center',
+            padding: '20px', border: '2px dashed #e0e0e0', borderRadius: '8px'
           }}>
             📁 Нажмите "Выбрать фото" чтобы добавить изображения
           </div>
@@ -724,34 +516,16 @@ export default function App() {
       </div>
 
       {/* === БЛОК ТЕГОВ === */}
-      <div style={{ 
-        marginBottom: '20px', 
-        padding: '15px', 
-        background: '#f8f9fa',
-        borderRadius: '12px',
-        border: '1px solid #e0e0e0'
-      }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center',
-          marginBottom: '12px'
-        }}>
-          <h3 style={{ margin: 0, fontSize: '16px', color: '#333' }}>
-            🏷️ Теги ({tags.length})
-          </h3>
-          <button
-            onClick={() => setShowPopularTags(!showPopularTags)}
-            style={{
-              padding: '6px 12px',
-              background: showPopularTags ? '#6c5ce7' : 'white',
-              color: showPopularTags ? 'white' : '#6c5ce7',
-              border: '1px solid #6c5ce7',
-              borderRadius: '6px',
-              fontSize: '13px',
-              cursor: 'pointer'
-            }}
-          >
+      <div style={{ marginBottom: '20px', padding: '15px', background: '#f8f9fa', borderRadius: '12px', border: '1px solid #e0e0e0' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
+          <h3 style={{ margin: 0, fontSize: '16px', color: '#333' }}>️ Теги ({tags.length})</h3>
+          <button onClick={() => setShowPopularTags(!showPopularTags)} style={{
+            padding: '6px 12px',
+            background: showPopularTags ? '#6c5ce7' : 'white',
+            color: showPopularTags ? 'white' : '#6c5ce7',
+            border: '1px solid #6c5ce7', borderRadius: '6px',
+            fontSize: '13px', cursor: 'pointer'
+          }}>
             {showPopularTags ? '🙈 Скрыть популярные' : '⭐ Популярные теги'}
           </button>
         </div>
@@ -764,64 +538,34 @@ export default function App() {
             onChange={(e) => setNewTag(e.target.value)}
             onKeyDown={handleTagKeyDown}
             style={{ 
-              flex: 1,
-              padding: '10px 12px',
-              fontSize: '14px',
-              border: '1px solid #dfe1e5',
-              borderRadius: '6px',
-              boxSizing: 'border-box'
+              flex: 1, padding: '10px 12px', fontSize: '14px',
+              border: '1px solid #dfe1e5', borderRadius: '6px', boxSizing: 'border-box'
             }}
           />
-          <button
-            onClick={() => addTag(newTag)}
-            disabled={!newTag.trim()}
-            style={{
-              padding: '10px 16px',
-              background: !newTag.trim() ? '#a8b2c1' : '#6c5ce7',
-              color: 'white',
-              border: 'none',
-              borderRadius: '6px',
-              fontSize: '14px',
-              cursor: !newTag.trim() ? 'not-allowed' : 'pointer',
-              fontWeight: '500'
-            }}
-          >
-            ➕ Добавить
-          </button>
+          <button onClick={() => addTag(newTag)} disabled={!newTag.trim()} style={{
+            padding: '10px 16px',
+            background: !newTag.trim() ? '#a8b2c1' : '#6c5ce7',
+            color: 'white', border: 'none', borderRadius: '6px',
+            fontSize: '14px', cursor: !newTag.trim() ? 'not-allowed' : 'pointer', fontWeight: '500'
+          }}>➕ Добавить</button>
         </div>
 
         {showPopularTags && (
-          <div style={{ 
-            marginBottom: '12px',
-            padding: '10px',
-            background: 'white',
-            borderRadius: '6px',
-            border: '1px solid #e0e0e0'
-          }}>
-            <div style={{ fontSize: '12px', color: '#818C99', marginBottom: '8px' }}>
-              Нажмите на тег, чтобы добавить:
-            </div>
+          <div style={{ marginBottom: '12px', padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
+            <div style={{ fontSize: '12px', color: '#818C99', marginBottom: '8px' }}>Нажмите на тег, чтобы добавить:</div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
               {POPULAR_TAGS.map((tag) => {
                 const isAdded = tags.includes(tag);
                 return (
-                  <button
-                    key={tag}
-                    onClick={() => !isAdded && addTag(tag)}
-                    disabled={isAdded}
-                    style={{
-                      padding: '6px 12px',
-                      background: isAdded ? '#e0e0e0' : '#f0f0ff',
-                      color: isAdded ? '#999' : '#6c5ce7',
-                      border: `1px solid ${isAdded ? '#ccc' : '#6c5ce7'}`,
-                      borderRadius: '16px',
-                      fontSize: '13px',
-                      cursor: isAdded ? 'not-allowed' : 'pointer',
-                      textDecoration: isAdded ? 'line-through' : 'none'
-                    }}
-                  >
-                    #{tag}
-                  </button>
+                  <button key={tag} onClick={() => !isAdded && addTag(tag)} disabled={isAdded} style={{
+                    padding: '6px 12px',
+                    background: isAdded ? '#e0e0e0' : '#f0f0ff',
+                    color: isAdded ? '#999' : '#6c5ce7',
+                    border: `1px solid ${isAdded ? '#ccc' : '#6c5ce7'}`,
+                    borderRadius: '16px', fontSize: '13px',
+                    cursor: isAdded ? 'not-allowed' : 'pointer',
+                    textDecoration: isAdded ? 'line-through' : 'none'
+                  }}>#{tag}</button>
                 );
               })}
             </div>
@@ -831,48 +575,24 @@ export default function App() {
         {tags.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {tags.map((tag) => (
-              <div
-                key={tag}
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: '6px',
-                  padding: '6px 12px',
-                  background: '#6c5ce7',
-                  color: 'white',
-                  borderRadius: '16px',
-                  fontSize: '13px',
-                  fontWeight: '500'
-                }}
-              >
+              <div key={tag} style={{
+                display: 'inline-flex', alignItems: 'center', gap: '6px',
+                padding: '6px 12px', background: '#6c5ce7', color: 'white',
+                borderRadius: '16px', fontSize: '13px', fontWeight: '500'
+              }}>
                 <span>#{tag}</span>
-                <button
-                  onClick={() => removeTag(tag)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'white',
-                    cursor: 'pointer',
-                    fontSize: '16px',
-                    padding: '0 2px',
-                    lineHeight: 1,
-                    fontWeight: 'bold'
-                  }}
-                >
-                  ×
-                </button>
+                <button onClick={() => removeTag(tag)} style={{
+                  background: 'transparent', border: 'none', color: 'white',
+                  cursor: 'pointer', fontSize: '16px', padding: '0 2px',
+                  lineHeight: 1, fontWeight: 'bold'
+                }}>×</button>
               </div>
             ))}
           </div>
         )}
 
         {tags.length === 0 && (
-          <div style={{ 
-            fontSize: '13px', 
-            color: '#818C99',
-            textAlign: 'center',
-            padding: '10px'
-          }}>
+          <div style={{ fontSize: '13px', color: '#818C99', textAlign: 'center', padding: '10px' }}>
             Теги не добавлены. Они будут автоматически добавлены в конец поста.
           </div>
         )}
@@ -880,13 +600,9 @@ export default function App() {
 
       {tags.length > 0 && (
         <div style={{ 
-          marginBottom: '15px', 
-          padding: '10px 15px', 
-          background: '#e8f5e9',
-          borderRadius: '8px',
-          border: '1px solid #4caf50',
-          fontSize: '13px',
-          color: '#2e7d32'
+          marginBottom: '15px', padding: '10px 15px',
+          background: '#e8f5e9', borderRadius: '8px',
+          border: '1px solid #4caf50', fontSize: '13px', color: '#2e7d32'
         }}>
           <strong>👁️ Будет добавлено в конец поста:</strong>
           <div style={{ marginTop: '5px', fontStyle: 'italic' }}>
@@ -902,40 +618,22 @@ export default function App() {
           value={groupId}
           onChange={(e) => setGroupId(e.target.value)}
           style={{ 
-            width: '100%', 
-            padding: '12px',
-            fontSize: '15px',
-            border: '1px solid #dfe1e5',
-            borderRadius: '8px',
-            boxSizing: 'border-box',
-            fontFamily: 'inherit'
+            width: '100%', padding: '12px', fontSize: '15px',
+            border: '1px solid #dfe1e5', borderRadius: '8px',
+            boxSizing: 'border-box', fontFamily: 'inherit'
           }}
         />
-        <div style={{ 
-          fontSize: '13px', 
-          color: '#818C99', 
-          marginTop: '5px' 
-        }}>
-          ID группы без минуса
-        </div>
+        <div style={{ fontSize: '13px', color: '#818C99', marginTop: '5px' }}>ID группы без минуса</div>
       </div>
 
-      <button
-        onClick={publishPost}
-        disabled={!post.text.trim() && images.length === 0}
-        style={{
-          width: '100%',
-          padding: '14px',
-          background: (!post.text.trim() && images.length === 0) ? '#a8b2c1' : '#4a76a8',
-          color: 'white',
-          border: 'none',
-          borderRadius: '8px',
-          fontSize: '17px',
-          fontWeight: '600',
-          cursor: (!post.text.trim() && images.length === 0) ? 'not-allowed' : 'pointer',
-          transition: 'background 0.2s'
-        }}
-      >
+      <button onClick={publishPost} disabled={!post.text.trim() && images.length === 0} style={{
+        width: '100%', padding: '14px',
+        background: (!post.text.trim() && images.length === 0) ? '#a8b2c1' : '#4a76a8',
+        color: 'white', border: 'none', borderRadius: '8px',
+        fontSize: '17px', fontWeight: '600',
+        cursor: (!post.text.trim() && images.length === 0) ? 'not-allowed' : 'pointer',
+        transition: 'background 0.2s'
+      }}>
         📤 Опубликовать
         {images.length > 0 && ` с ${images.length} фото`}
         {tags.length > 0 && ` и ${tags.length} тег.`}
@@ -943,20 +641,13 @@ export default function App() {
 
       {snackbar && (
         <div style={{
-          position: 'fixed',
-          bottom: '20px',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          padding: '14px 28px',
+          position: 'fixed', bottom: '20px', left: '50%',
+          transform: 'translateX(-50%)', padding: '14px 28px',
           background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('⚠️') ? '#FF9800' : '#f44336',
-          color: 'white',
-          borderRadius: '8px',
+          color: 'white', borderRadius: '8px',
           boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-          fontSize: '15px',
-          zIndex: 1000,
-          textAlign: 'center',
-          minWidth: '300px',
-          fontWeight: '500'
+          fontSize: '15px', zIndex: 1000, textAlign: 'center',
+          minWidth: '300px', fontWeight: '500'
         }}>
           {snackbar}
         </div>
