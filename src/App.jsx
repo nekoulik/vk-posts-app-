@@ -12,11 +12,11 @@ const TEMPLATES = [
   {
     id: 'promo',
     name: '🎉 Акция',
-    text: '🎉 АКЦИЯ!\n\n{название акции}\n\n С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки'
+    text: ' АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки'
   },
   {
     id: 'question',
-    name: ' Вопрос',
+    name: '❓ Вопрос',
     text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос'
   },
   {
@@ -27,12 +27,12 @@ const TEMPLATES = [
   {
     id: 'product',
     name: '🛍️ Товар',
-    text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n Для заказа пишите в ЛС\n\n#товар #магазин'
+    text: '🛍️ {название товара}\n\n Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин'
   },
   {
     id: 'event',
-    name: ' Событие',
-    text: ' Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча'
+    name: '📅 Событие',
+    text: '📅 Приглашаем на событие!\n\n{название события}\n\n️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча'
   },
   {
     id: 'quote',
@@ -42,7 +42,7 @@ const TEMPLATES = [
   {
     id: 'contest',
     name: '🏆 Конкурс',
-    text: ' КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш'
+    text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш'
   }
 ];
 
@@ -65,8 +65,6 @@ export default function App() {
   const [tags, setTags] = useState([]);
   const [newTag, setNewTag] = useState('');
   const [showPopularTags, setShowPopularTags] = useState(false);
-  
-  // Новые состояния для изображений
   const [images, setImages] = useState([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef(null);
@@ -81,7 +79,6 @@ export default function App() {
           setPost({ text: draft.text });
           setGroupId(draft.groupId || '240736389');
           setTags(draft.tags || []);
-          // Восстанавливаем только URL изображений (если есть)
           if (draft.images && draft.images.length > 0) {
             setImages(draft.images);
           }
@@ -103,7 +100,14 @@ export default function App() {
         text: post.text,
         groupId: groupId,
         tags: tags,
-        images: images.map(img => ({ url: img.url })), // Сохраняем только URL
+        images: images.map(img => ({ 
+          tempId: img.tempId,
+          url: img.url,
+          id: img.id,
+          owner_id: img.owner_id,
+          access_key: img.access_key,
+          uploaded: img.uploaded
+        })),
         savedAt: new Date().toISOString()
       };
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
@@ -112,12 +116,10 @@ export default function App() {
 
   // === ФУНКЦИИ ДЛЯ ИЗОБРАЖЕНИЙ ===
 
-  // Выбор файла
   const handleFileSelect = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
-    // Проверка лимита (макс 10 фото в посте VK)
     if (images.length + files.length > 10) {
       setSnackbar('⚠️ Можно загрузить максимум 10 фото');
       setTimeout(() => setSnackbar(null), 3000);
@@ -129,33 +131,37 @@ export default function App() {
     try {
       const cleanGroupId = groupId.replace('-', '');
 
-      // 1. Получаем URL для загрузки
-      const uploadServer = await vkBridge.send('VKWebAppCallAPIMethod', {
-        method: 'photos.getWallUploadServer',
-        params: {
-          group_id: cleanGroupId,
-          access_token: SERVICE_TOKEN
-        }
-      });
+      // 1. Получаем URL для загрузки через VK API напрямую
+      const serverResponse = await fetch(
+        `https://api.vk.com/method/photos.getWallUploadServer?` +
+        `group_id=${cleanGroupId}&` +
+        `access_token=${SERVICE_TOKEN}&` +
+        `v=5.131`
+      );
+      
+      const serverData = await serverResponse.json();
+      console.log('Upload server:', serverData);
+      
+      if (serverData.error) {
+        throw new Error(serverData.error.error_msg || 'Не удалось получить сервер загрузки');
+      }
+      
+      const uploadUrl = serverData.response.upload_url;
 
       // 2. Загружаем каждое изображение
       for (const file of files) {
-        // Проверка размера (макс 5MB)
         if (file.size > 5 * 1024 * 1024) {
           setSnackbar(`⚠️ Файл "${file.name}" слишком большой (макс. 5MB)`);
           setTimeout(() => setSnackbar(null), 3000);
           continue;
         }
 
-        // Создаём превью
         const previewUrl = URL.createObjectURL(file);
-        
-        // Добавляем в состояние с статусом "загрузка"
         const tempId = Date.now() + Math.random();
+        
         setImages(prev => [...prev, { 
           tempId, 
           url: previewUrl, 
-          file: file, 
           uploading: true 
         }]);
 
@@ -164,32 +170,38 @@ export default function App() {
           const formData = new FormData();
           formData.append('photo', file);
           
-          const uploadResponse = await fetch(uploadServer.upload_url, {
+          const uploadResponse = await fetch(uploadUrl, {
             method: 'POST',
             body: formData
           });
           
           const uploadData = await uploadResponse.json();
+          console.log('Upload data:', uploadData);
 
           // 3. Сохраняем фото
-          const saved = await vkBridge.send('VKWebAppCallAPIMethod', {
-            method: 'photos.saveWallPhoto',
-            params: {
-              group_id: cleanGroupId,
-              photo: uploadData.photo,
-              server: uploadData.server,
-              hash: uploadData.hash,
-              access_token: SERVICE_TOKEN
-            }
-          });
+          const saveResponse = await fetch(
+            `https://api.vk.com/method/photos.saveWallPhoto?` +
+            `group_id=${cleanGroupId}&` +
+            `photo=${uploadData.photo}&` +
+            `server=${uploadData.server}&` +
+            `hash=${uploadData.hash}&` +
+            `access_token=${SERVICE_TOKEN}&` +
+            `v=5.131`
+          );
+          
+          const saveData = await saveResponse.json();
+          console.log('Save data:', saveData);
+          
+          if (saveData.error) {
+            throw new Error(saveData.error.error_msg);
+          }
 
-          // Обновляем статус на "загружено"
           setImages(prev => prev.map(img => 
             img.tempId === tempId ? {
               ...img,
-              id: saved[0].id,
-              owner_id: saved[0].owner_id,
-              access_key: saved[0].access_key,
+              id: saveData.response[0].id,
+              owner_id: saveData.response[0].owner_id,
+              access_key: saveData.response[0].access_key,
               uploading: false,
               uploaded: true
             } : img
@@ -199,25 +211,22 @@ export default function App() {
           console.error('Ошибка загрузки фото:', uploadError);
           setSnackbar(`❌ Не удалось загрузить "${file.name}"`);
           setTimeout(() => setSnackbar(null), 3000);
-          // Удаляем из списка
           setImages(prev => prev.filter(img => img.tempId !== tempId));
         }
       }
 
     } catch (error) {
-      console.error('Ошибка получения сервера:', error);
-      setSnackbar('❌ Ошибка при загрузке фото');
-      setTimeout(() => setSnackbar(null), 3000);
+      console.error('Ошибка:', error);
+      setSnackbar('❌ Ошибка при загрузке фото: ' + error.message);
+      setTimeout(() => setSnackbar(null), 5000);
     } finally {
       setUploading(false);
-      // Очищаем input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
     }
   };
 
-  // Удалить изображение
   const removeImage = (index) => {
     const img = images[index];
     if (img.url && img.url.startsWith('blob:')) {
@@ -271,7 +280,6 @@ export default function App() {
   };
 
   const clearAll = () => {
-    // Очищаем blob URL
     images.forEach(img => {
       if (img.url && img.url.startsWith('blob:')) {
         URL.revokeObjectURL(img.url);
@@ -302,7 +310,7 @@ export default function App() {
           if (draft.images) {
             setImages(draft.images.map(img => ({ ...img, uploading: false })));
           }
-          setSnackbar('️ Черновик восстановлен');
+          setSnackbar('♻️ Черновик восстановлен');
           setTimeout(() => setSnackbar(null), 3000);
         }
       }
@@ -315,12 +323,11 @@ export default function App() {
     const finalText = getFinalText();
     
     if (!finalText.trim() && images.length === 0) {
-      setSnackbar('⚠️ Введите текст или добавьте фото');
+      setSnackbar('️ Введите текст или добавьте фото');
       setTimeout(() => setSnackbar(null), 3000);
       return;
     }
 
-    // Проверка что все фото загрузились
     if (images.some(img => img.uploading)) {
       setSnackbar('⏳ Дождитесь окончания загрузки фото...');
       setTimeout(() => setSnackbar(null), 3000);
@@ -338,7 +345,6 @@ export default function App() {
     try {
       setSnackbar('⏳ Публикация...');
 
-      // Формируем attachments для фото
       let attachments = '';
       if (images.length > 0) {
         const photoIds = images
@@ -355,7 +361,6 @@ export default function App() {
         v: '5.131'
       };
 
-      // Добавляем attachments если есть фото
       if (attachments) {
         params.attachments = attachments;
       }
@@ -367,7 +372,6 @@ export default function App() {
 
       console.log('Post published:', response);
       
-      // Очищаем blob URL
       images.forEach(img => {
         if (img.url && img.url.startsWith('blob:')) {
           URL.revokeObjectURL(img.url);
@@ -593,7 +597,6 @@ export default function App() {
           🖼️ Изображения ({images.length}/10)
         </h3>
 
-        {/* Кнопка выбора файла */}
         <div style={{ marginBottom: '15px' }}>
           <input
             ref={fileInputRef}
@@ -663,7 +666,6 @@ export default function App() {
                   }}
                 />
                 
-                {/* Индикатор загрузки */}
                 {img.uploading && (
                   <div style={{
                     position: 'absolute',
@@ -678,7 +680,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Кнопка удаления */}
                 <button
                   onClick={() => removeImage(index)}
                   style={{
@@ -702,7 +703,6 @@ export default function App() {
                   ×
                 </button>
 
-                {/* Статус */}
                 <div style={{
                   position: 'absolute',
                   bottom: '0',
@@ -750,7 +750,7 @@ export default function App() {
           marginBottom: '12px'
         }}>
           <h3 style={{ margin: 0, fontSize: '16px', color: '#333' }}>
-            🏷️ Теги ({tags.length})
+            ️ Теги ({tags.length})
           </h3>
           <button
             onClick={() => setShowPopularTags(!showPopularTags)}
@@ -768,7 +768,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* Поле ввода нового тега */}
         <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
           <input
             type="text"
@@ -803,7 +802,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* Популярные теги */}
         {showPopularTags && (
           <div style={{ 
             marginBottom: '12px',
@@ -842,7 +840,6 @@ export default function App() {
           </div>
         )}
 
-        {/* Отображение добавленных тегов */}
         {tags.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {tags.map((tag) => (
