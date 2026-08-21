@@ -94,7 +94,7 @@ export default function App() {
       const cleanGroupId = groupId.replace('-', '');
 
       // ШАГ 0: Получаем токен пользователя через VK Bridge
-      setSnackbar(' Получение прав на загрузку фото...');
+      setSnackbar('⏳ Получение прав на загрузку фото...');
       
       let userToken = SERVICE_TOKEN; // fallback
       
@@ -124,7 +124,7 @@ export default function App() {
         }]);
 
         try {
-          // ШАГ 1: Получаем URL сервера загрузки (с токеном пользователя!)
+          // ШАГ 1: Получаем URL сервера загрузки
           const uploadServerResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.getWallUploadServer',
             params: {
@@ -134,8 +134,13 @@ export default function App() {
             }
           });
 
-          const uploadUrl = uploadServerResponse.upload_url;
+          // ✅ ИСПРАВЛЕНИЕ: Читаем из response.upload_url
+          const uploadUrl = uploadServerResponse.response?.upload_url || uploadServerResponse.upload_url;
           console.log('Upload URL:', uploadUrl);
+
+          if (!uploadUrl) {
+            throw new Error('Не получен upload_url от VK');
+          }
 
           // ШАГ 2: Загружаем файл напрямую на этот URL
           const formData = new FormData();
@@ -149,7 +154,7 @@ export default function App() {
           const uploadData = await uploadResponse.json();
           console.log('Upload data:', uploadData);
 
-          // ШАГ 3: Сохраняем фото (с токеном пользователя!)
+          // ШАГ 3: Сохраняем фото
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.saveWallPhoto',
             params: {
@@ -162,14 +167,20 @@ export default function App() {
             }
           });
 
-          console.log('Saved photo:', savedResponse);
+          // ✅ ИСПРАВЛЕНИЕ: Читаем из response[0]
+          const savedPhoto = savedResponse.response?.[0] || savedResponse[0];
+          console.log('Saved photo:', savedPhoto);
+
+          if (!savedPhoto) {
+            throw new Error('Не удалось сохранить фото');
+          }
 
           setImages(prev => prev.map(img => 
             img.tempId === tempId ? {
               ...img,
-              id: savedResponse[0].id,
-              owner_id: savedResponse[0].owner_id,
-              access_key: savedResponse[0].access_key,
+              id: savedPhoto.id,
+              owner_id: savedPhoto.owner_id,
+              access_key: savedPhoto.access_key,
               uploading: false,
               uploaded: true
             } : img
