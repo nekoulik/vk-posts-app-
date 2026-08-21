@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import vkBridge from '@vkontakte/vk-bridge';
 
-// Получаем токен из переменной окружения
 const SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
 
-// Шаблоны постов
 const TEMPLATES = [
   {
     id: 'news',
@@ -34,21 +32,20 @@ const TEMPLATES = [
   {
     id: 'event',
     name: '📅 Событие',
-    text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча'
+    text: ' Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча'
   },
   {
     id: 'quote',
     name: '💬 Цитата',
-    text: ' {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость'
+    text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость'
   },
   {
     id: 'contest',
     name: '🏆 Конкурс',
-    text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n Приз: {приз}\n\n До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш'
+    text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш'
   }
 ];
 
-// Ключ для localStorage
 const DRAFT_KEY = 'vk_posts_draft';
 
 export default function App() {
@@ -57,27 +54,20 @@ export default function App() {
   const [groupId, setGroupId] = useState('240736389');
   const [showTemplates, setShowTemplates] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
-  const [hasDraft, setHasDraft] = useState(false);
+  const [draftLoaded, setDraftLoaded] = useState(false);
 
-  // Загрузка черновика при открытии приложения
+  // Загрузка черновика при открытии
   useEffect(() => {
     try {
       const savedDraft = localStorage.getItem(DRAFT_KEY);
       if (savedDraft) {
         const draft = JSON.parse(savedDraft);
-        if (draft.text) {
+        // Восстанавливаем ТОЛЬКО текст и ID группы, НЕ шаблон
+        if (draft.text && draft.text.trim()) {
           setPost({ text: draft.text });
-          setHasDraft(true);
-          console.log('Черновик восстановлен');
-        }
-        if (draft.groupId) {
-          setGroupId(draft.groupId);
-        }
-        if (draft.templateId) {
-          const template = TEMPLATES.find(t => t.id === draft.templateId);
-          if (template) {
-            setSelectedTemplate(template);
-          }
+          setGroupId(draft.groupId || '240736389');
+          setDraftLoaded(true);
+          console.log('Черновик загружен:', draft.text.substring(0, 50) + '...');
         }
       }
     } catch (e) {
@@ -87,54 +77,56 @@ export default function App() {
     vkBridge.send('VKWebAppInit').catch(console.error);
   }, []);
 
-  // Автосохранение черновика при изменениях
+  // Автосохранение при изменениях
   useEffect(() => {
-    const draft = {
-      text: post.text,
-      groupId: groupId,
-      templateId: selectedTemplate?.id || null,
-      savedAt: new Date().toISOString()
-    };
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
-    setHasDraft(true);
-  }, [post.text, groupId, selectedTemplate]);
+    if (post.text.trim()) {
+      const draft = {
+        text: post.text,
+        groupId: groupId,
+        savedAt: new Date().toISOString()
+      };
+      localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    }
+  }, [post.text, groupId]);
 
   // Загрузка шаблона
   const loadTemplate = (template) => {
     setPost({ text: template.text });
     setSelectedTemplate(template);
     setShowTemplates(false);
+    // НЕ сохраняем сразу в черновик - даём пользователю начать работу
     setSnackbar(`✅ Шаблон "${template.name}" загружен`);
     setTimeout(() => setSnackbar(null), 3000);
   };
 
-  // Очистить текст и черновик
-  const clearText = () => {
+  // Очистить всё - УДАЛЯЕТ ЧЕРНОВИК
+  const clearAll = () => {
     setPost({ text: '' });
     setSelectedTemplate(null);
-    localStorage.removeItem(DRAFT_KEY);
-    setHasDraft(false);
-    setSnackbar('️ Черновик удалён');
+    setShowTemplates(true); // Показываем шаблоны
+    localStorage.removeItem(DRAFT_KEY); // УДАЛЯЕМ ЧЕРНОВИК
+    setDraftLoaded(false);
+    setSnackbar('🗑️ Черновик удалён');
     setTimeout(() => setSnackbar(null), 3000);
   };
 
-  // Восстановить черновик (если был очищен)
+  // Восстановить черновик
   const restoreDraft = () => {
     try {
       const savedDraft = localStorage.getItem(DRAFT_KEY);
       if (savedDraft) {
         const draft = JSON.parse(savedDraft);
-        if (draft.text) setPost({ text: draft.text });
-        if (draft.groupId) setGroupId(draft.groupId);
-        if (draft.templateId) {
-          const template = TEMPLATES.find(t => t.id === draft.templateId);
-          if (template) setSelectedTemplate(template);
+        if (draft.text) {
+          setPost({ text: draft.text });
+          setGroupId(draft.groupId || '240736389');
+          setSnackbar('♻️ Черновик восстановлен');
+          setTimeout(() => setSnackbar(null), 3000);
         }
-        setSnackbar('♻️ Черновик восстановлен');
-        setTimeout(() => setSnackbar(null), 3000);
       }
     } catch (e) {
       console.error('Ошибка восстановления:', e);
+      setSnackbar('❌ Не удалось восстановить');
+      setTimeout(() => setSnackbar(null), 3000);
     }
   };
 
@@ -169,9 +161,9 @@ export default function App() {
 
       console.log('Post published:', response);
       
-      // Очищаем черновик после успешной публикации
+      // Удаляем черновик после публикации
       localStorage.removeItem(DRAFT_KEY);
-      setHasDraft(false);
+      setDraftLoaded(false);
       
       setSnackbar('✅ Пост опубликован!');
       setPost({ text: '' });
@@ -202,10 +194,10 @@ export default function App() {
       </h2>
 
       {/* Индикатор черновика */}
-      {hasDraft && post.text && (
+      {draftLoaded && (
         <div style={{ 
           marginBottom: '15px', 
-          padding: '10px 15px', 
+          padding: '12px 15px', 
           background: '#fff3cd',
           border: '1px solid #ffc107',
           borderRadius: '8px',
@@ -214,20 +206,20 @@ export default function App() {
           alignItems: 'center',
           fontSize: '14px'
         }}>
-          <span style={{ color: '#856404' }}>
+          <span style={{ color: '#856404', fontWeight: '500' }}>
             💾 Есть сохранённый черновик
           </span>
           <button
             onClick={restoreDraft}
             style={{
-              padding: '6px 12px',
+              padding: '8px 16px',
               background: '#ffc107',
               color: '#856404',
               border: 'none',
               borderRadius: '6px',
-              fontSize: '13px',
+              fontSize: '14px',
               cursor: 'pointer',
-              fontWeight: '500'
+              fontWeight: '600'
             }}
           >
             ♻️ Восстановить
@@ -253,9 +245,9 @@ export default function App() {
           {showTemplates ? '🙈 Скрыть шаблоны' : '📋 Выбрать шаблон'}
         </button>
         
-        {(post.text || hasDraft) && (
+        {(post.text || draftLoaded) && (
           <button
-            onClick={clearText}
+            onClick={clearAll}
             style={{
               padding: '10px 20px',
               background: '#e74c3c',
@@ -382,7 +374,7 @@ export default function App() {
           marginTop: '8px',
           textAlign: 'right'
         }}>
-          Символов: {post.text.length} {hasDraft && '• 💾 автосохранено'}
+          Символов: {post.text.length} {post.text.trim() && '• 💾 автосохранено'}
         </div>
       </div>
 
