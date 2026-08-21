@@ -77,7 +77,7 @@ export default function App() {
     }
   }, [post.text, groupId, tags, images]);
 
-  // === ЗАГРУЗКА ФОТО ЧЕРЕЗ VK BRIDGE ===
+    // === ЗАГРУЗКА ФОТО ЧЕРЕЗ VK BRIDGE (ИСПРАВЛЕННАЯ) ===
   const handleFileSelect = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -95,7 +95,7 @@ export default function App() {
 
       for (const file of files) {
         if (file.size > 5 * 1024 * 1024) {
-          setSnackbar(`️ Файл "${file.name}" слишком большой (макс. 5MB)`);
+          setSnackbar(`⚠️ Файл "${file.name}" слишком большой (макс. 5MB)`);
           setTimeout(() => setSnackbar(null), 3000);
           continue;
         }
@@ -108,19 +108,20 @@ export default function App() {
         }]);
 
         try {
-          // 1. Получаем URL для загрузки через VK Bridge
-          const uploadServer = await vkBridge.send('VKWebAppCallAPIMethod', {
+          // ШАГ 1: Получаем URL сервера загрузки
+          const uploadServerResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.getWallUploadServer',
             params: {
               group_id: cleanGroupId,
-              access_token: SERVICE_TOKEN
+              access_token: SERVICE_TOKEN,
+              v: '5.131'
             }
           });
 
-          const uploadUrl = uploadServer.upload_url;
+          const uploadUrl = uploadServerResponse.upload_url;
           console.log('Upload URL:', uploadUrl);
 
-          // 2. Загружаем файл напрямую на upload URL
+          // ШАГ 2: Загружаем файл напрямую на этот URL
           const formData = new FormData();
           formData.append('photo', file);
           
@@ -132,26 +133,27 @@ export default function App() {
           const uploadData = await uploadResponse.json();
           console.log('Upload data:', uploadData);
 
-          // 3. Сохраняем фото через VK Bridge
-          const saved = await vkBridge.send('VKWebAppCallAPIMethod', {
+          // ШАГ 3: Сохраняем фото в альбоме стены через VK Bridge
+          const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.saveWallPhoto',
             params: {
               group_id: cleanGroupId,
               photo: uploadData.photo,
               server: uploadData.server,
               hash: uploadData.hash,
-              access_token: SERVICE_TOKEN
+              access_token: SERVICE_TOKEN,
+              v: '5.131'
             }
           });
 
-          console.log('Saved photo:', saved);
+          console.log('Saved photo:', savedResponse);
 
           setImages(prev => prev.map(img => 
             img.tempId === tempId ? {
               ...img,
-              id: saved[0].id,
-              owner_id: saved[0].owner_id,
-              access_key: saved[0].access_key,
+              id: savedResponse[0].id,
+              owner_id: savedResponse[0].owner_id,
+              access_key: savedResponse[0].access_key,
               uploading: false,
               uploaded: true
             } : img
