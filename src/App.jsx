@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import vkBridge from '@vkontakte/vk-bridge';
+import { WORKER_URL } from './config';
 
 const SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
 
@@ -7,16 +8,16 @@ const TEMPLATES = [
   {
     id: 'news',
     name: '📢 Новость',
-    text: ' Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно'
+    text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно'
   },
   {
     id: 'promo',
-    name: ' Акция',
+    name: '🎉 Акция',
     text: '🎉 АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки'
   },
   {
     id: 'question',
-    name: ' Вопрос',
+    name: '❓ Вопрос',
     text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос'
   },
   {
@@ -27,12 +28,12 @@ const TEMPLATES = [
   {
     id: 'product',
     name: '🛍️ Товар',
-    text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин'
+    text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин'
   },
   {
     id: 'event',
     name: '📅 Событие',
-    text: '📅 Приглашаем на событие!\n\n{название события}\n\n️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча'
+    text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча'
   },
   {
     id: 'quote',
@@ -41,8 +42,8 @@ const TEMPLATES = [
   },
   {
     id: 'contest',
-    name: ' Конкурс',
-    text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш'
+    name: '🏆 Конкурс',
+    text: ' КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш'
   }
 ];
 
@@ -65,6 +66,9 @@ export default function App() {
   const [tags, setTags] = useState([]);
   const [newTag, setNewTag] = useState('');
   const [showPopularTags, setShowPopularTags] = useState(false);
+  const [images, setImages] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   // Загрузка черновика
   useEffect(() => {
@@ -76,6 +80,9 @@ export default function App() {
           setPost({ text: draft.text });
           setGroupId(draft.groupId || '240736389');
           setTags(draft.tags || []);
+          if (draft.images && draft.images.length > 0) {
+            setImages(draft.images);
+          }
           setDraftLoaded(true);
         }
       }
@@ -88,16 +95,139 @@ export default function App() {
 
   // Автосохранение
   useEffect(() => {
-    if (post.text.trim() || tags.length > 0) {
+    if (post.text.trim() || tags.length > 0 || images.length > 0) {
       const draft = {
         text: post.text,
         groupId: groupId,
         tags: tags,
+        images: images.map(img => ({ 
+          tempId: img.tempId,
+          url: img.url,
+          id: img.id,
+          owner_id: img.owner_id,
+          access_key: img.access_key,
+          uploaded: img.uploaded
+        })),
         savedAt: new Date().toISOString()
       };
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     }
-  }, [post.text, groupId, tags]);
+  }, [post.text, groupId, tags, images]);
+
+  // === ФУНКЦИИ ДЛЯ ИЗОБРАЖЕНИЙ (через Worker) ===
+
+  const handleFileSelect = async (e) => {
+    const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+
+    if (images.length + files.length > 10) {
+      setSnackbar('⚠️ Можно загрузить максимум 10 фото');
+      setTimeout(() => setSnackbar(null), 3000);
+      return;
+    }
+
+    setUploading(true);
+
+    try {
+      const cleanGroupId = groupId.replace('-', '');
+
+      // 1. Получаем URL для загрузки через Worker
+      const getServerUrl = `${WORKER_URL}?url=${encodeURIComponent(
+        `https://api.vk.com/method/photos.getWallUploadServer?group_id=${cleanGroupId}&access_token=${SERVICE_TOKEN}&v=5.131`
+      )}`;
+
+      const serverResponse = await fetch(getServerUrl);
+      const serverData = await serverResponse.json();
+      
+      console.log('Upload server:', serverData);
+      
+      if (serverData.error) {
+        throw new Error(serverData.error.error_msg || 'Не удалось получить сервер загрузки');
+      }
+      
+      const uploadUrl = serverData.response.upload_url;
+
+      // 2. Загружаем каждое изображение
+      for (const file of files) {
+        if (file.size > 5 * 1024 * 1024) {
+          setSnackbar(`⚠️ Файл "${file.name}" слишком большой (макс. 5MB)`);
+          setTimeout(() => setSnackbar(null), 3000);
+          continue;
+        }
+
+        const previewUrl = URL.createObjectURL(file);
+        const tempId = Date.now() + Math.random();
+        
+        setImages(prev => [...prev, { 
+          tempId, 
+          url: previewUrl, 
+          uploading: true 
+        }]);
+
+        try {
+          // Загружаем на сервер VK напрямую (без Worker, т.к. это upload URL)
+          const formData = new FormData();
+          formData.append('photo', file);
+          
+          const uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+            body: formData
+          });
+          
+          const uploadData = await uploadResponse.json();
+          console.log('Upload data:', uploadData);
+
+          // 3. Сохраняем фото через Worker
+          const saveUrl = `${WORKER_URL}?url=${encodeURIComponent(
+            `https://api.vk.com/method/photos.saveWallPhoto?group_id=${cleanGroupId}&photo=${uploadData.photo}&server=${uploadData.server}&hash=${uploadData.hash}&access_token=${SERVICE_TOKEN}&v=5.131`
+          )}`;
+
+          const saveResponse = await fetch(saveUrl);
+          const saveData = await saveResponse.json();
+          console.log('Save data:', saveData);
+          
+          if (saveData.error) {
+            throw new Error(saveData.error.error_msg);
+          }
+
+          setImages(prev => prev.map(img => 
+            img.tempId === tempId ? {
+              ...img,
+              id: saveData.response[0].id,
+              owner_id: saveData.response[0].owner_id,
+              access_key: saveData.response[0].access_key,
+              uploading: false,
+              uploaded: true
+            } : img
+          ));
+
+        } catch (uploadError) {
+          console.error('Ошибка загрузки фото:', uploadError);
+          setSnackbar(`❌ Не удалось загрузить "${file.name}"`);
+          setTimeout(() => setSnackbar(null), 3000);
+          setImages(prev => prev.filter(img => img.tempId !== tempId));
+        }
+      }
+
+    } catch (error) {
+      console.error('Ошибка:', error);
+      setSnackbar('❌ Ошибка при загрузке фото: ' + error.message);
+      setTimeout(() => setSnackbar(null), 5000);
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const removeImage = (index) => {
+    const img = images[index];
+    if (img.url && img.url.startsWith('blob:')) {
+      URL.revokeObjectURL(img.url);
+    }
+    setImages(images.filter((_, i) => i !== index));
+  };
 
   // === ФУНКЦИИ ДЛЯ ТЕГОВ ===
 
@@ -144,14 +274,21 @@ export default function App() {
   };
 
   const clearAll = () => {
+    images.forEach(img => {
+      if (img.url && img.url.startsWith('blob:')) {
+        URL.revokeObjectURL(img.url);
+      }
+    });
+    
     setPost({ text: '' });
     setSelectedTemplate(null);
     setTags([]);
     setNewTag('');
+    setImages([]);
     setShowTemplates(true);
     localStorage.removeItem(DRAFT_KEY);
     setDraftLoaded(false);
-    setSnackbar('️ Черновик удалён');
+    setSnackbar('🗑️ Черновик удалён');
     setTimeout(() => setSnackbar(null), 3000);
   };
 
@@ -164,6 +301,9 @@ export default function App() {
           setPost({ text: draft.text });
           setGroupId(draft.groupId || '240736389');
           setTags(draft.tags || []);
+          if (draft.images) {
+            setImages(draft.images.map(img => ({ ...img, uploading: false })));
+          }
           setSnackbar('♻️ Черновик восстановлен');
           setTimeout(() => setSnackbar(null), 3000);
         }
@@ -176,8 +316,14 @@ export default function App() {
   const publishPost = async () => {
     const finalText = getFinalText();
     
-    if (!finalText.trim()) {
-      setSnackbar('️ Введите текст поста');
+    if (!finalText.trim() && images.length === 0) {
+      setSnackbar('️ Введите текст или добавьте фото');
+      setTimeout(() => setSnackbar(null), 3000);
+      return;
+    }
+
+    if (images.some(img => img.uploading)) {
+      setSnackbar('⏳ Дождитесь окончания загрузки фото...');
       setTimeout(() => setSnackbar(null), 3000);
       return;
     }
@@ -193,18 +339,38 @@ export default function App() {
     try {
       setSnackbar('⏳ Публикация...');
 
+      let attachments = '';
+      if (images.length > 0) {
+        const photoIds = images
+          .filter(img => img.uploaded)
+          .map(img => `${img.owner_id}_${img.id}`);
+        attachments = photoIds.join(',');
+      }
+
+      const params = {
+        owner_id: -parseInt(cleanGroupId),
+        message: finalText,
+        from_group: 1,
+        access_token: SERVICE_TOKEN,
+        v: '5.131'
+      };
+
+      if (attachments) {
+        params.attachments = attachments;
+      }
+
       const response = await vkBridge.send('VKWebAppCallAPIMethod', {
         method: 'wall.post',
-        params: {
-          owner_id: -parseInt(cleanGroupId),
-          message: finalText,
-          from_group: 1,
-          access_token: SERVICE_TOKEN,
-          v: '5.131'
-        },
+        params: params
       });
 
       console.log('Post published:', response);
+      
+      images.forEach(img => {
+        if (img.url && img.url.startsWith('blob:')) {
+          URL.revokeObjectURL(img.url);
+        }
+      });
       
       localStorage.removeItem(DRAFT_KEY);
       setDraftLoaded(false);
@@ -213,6 +379,7 @@ export default function App() {
       setPost({ text: '' });
       setTags([]);
       setNewTag('');
+      setImages([]);
       setSelectedTemplate(null);
       setTimeout(() => setSnackbar(null), 3000);
     } catch (e) {
@@ -239,7 +406,6 @@ export default function App() {
         Редактор поста
       </h2>
 
-      {/* Индикатор черновика */}
       {draftLoaded && (
         <div style={{ 
           marginBottom: '15px', 
@@ -253,7 +419,7 @@ export default function App() {
           fontSize: '14px'
         }}>
           <span style={{ color: '#856404', fontWeight: '500' }}>
-            💾 Есть сохранённый черновик
+             Есть сохранённый черновик
           </span>
           <button
             onClick={restoreDraft}
@@ -273,7 +439,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Кнопки управления */}
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         <button
           onClick={() => setShowTemplates(!showTemplates)}
@@ -291,7 +456,7 @@ export default function App() {
           {showTemplates ? '🙈 Скрыть шаблоны' : '📋 Выбрать шаблон'}
         </button>
         
-        {(post.text || draftLoaded || tags.length > 0) && (
+        {(post.text || draftLoaded || tags.length > 0 || images.length > 0) && (
           <button
             onClick={clearAll}
             style={{
@@ -310,7 +475,6 @@ export default function App() {
         )}
       </div>
 
-      {/* Список шаблонов */}
       {showTemplates && (
         <div style={{ 
           marginBottom: '20px', 
@@ -351,7 +515,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Текущий шаблон */}
       {selectedTemplate && !showTemplates && (
         <div style={{ 
           marginBottom: '15px', 
@@ -383,7 +546,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Текстовое поле */}
       <div style={{ marginBottom: '15px' }}>
         <textarea
           placeholder="Текст поста... (или выберите шаблон выше)"
@@ -410,6 +572,155 @@ export default function App() {
         }}>
           Символов: {post.text.length} {post.text.trim() && '• 💾 автосохранено'}
         </div>
+      </div>
+
+      {/* === БЛОК ЗАГРУЗКИ ИЗОБРАЖЕНИЙ === */}
+      <div style={{ 
+        marginBottom: '20px', 
+        padding: '15px', 
+        background: '#f8f9fa',
+        borderRadius: '12px',
+        border: '1px solid #e0e0e0'
+      }}>
+        <h3 style={{ margin: '0 0 12px 0', fontSize: '16px', color: '#333' }}>
+          🖼️ Изображения ({images.length}/10)
+        </h3>
+
+        <div style={{ marginBottom: '15px' }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={handleFileSelect}
+            disabled={uploading || images.length >= 10}
+            style={{ display: 'none' }}
+            id="image-upload"
+          />
+          <label
+            htmlFor="image-upload"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 20px',
+              background: images.length >= 10 ? '#a8b2c1' : uploading ? '#f0ad4e' : '#6c5ce7',
+              color: 'white',
+              borderRadius: '8px',
+              fontSize: '15px',
+              cursor: images.length >= 10 ? 'not-allowed' : 'pointer',
+              fontWeight: '500',
+              transition: 'background 0.2s'
+            }}
+          >
+            {uploading ? '⏳ Загрузка...' : images.length >= 10 ? '📁 Максимум фото' : '📁 Выбрать фото'}
+          </label>
+          <span style={{ 
+            marginLeft: '12px', 
+            fontSize: '13px', 
+            color: '#818C99' 
+          }}>
+            (JPG, PNG, GIF до 5MB)
+          </span>
+        </div>
+
+        {images.length > 0 && (
+          <div style={{ 
+            display: 'grid', 
+            gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', 
+            gap: '12px' 
+          }}>
+            {images.map((img, index) => (
+              <div
+                key={img.tempId || img.id}
+                style={{
+                  position: 'relative',
+                  borderRadius: '8px',
+                  overflow: 'hidden',
+                  border: '2px solid',
+                  borderColor: img.uploading ? '#f0ad4e' : img.uploaded ? '#4CAF50' : '#e74c3c',
+                  aspectRatio: '1',
+                  background: '#000'
+                }}
+              >
+                <img
+                  src={img.url}
+                  alt={`Upload ${index}`}
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'cover',
+                    opacity: img.uploading ? 0.6 : 1
+                  }}
+                />
+                
+                {img.uploading && (
+                  <div style={{
+                    position: 'absolute',
+                    top: '50%',
+                    left: '50%',
+                    transform: 'translate(-50%, -50%)',
+                    color: 'white',
+                    fontSize: '24px',
+                    fontWeight: 'bold'
+                  }}>
+                    ⏳
+                  </div>
+                )}
+
+                <button
+                  onClick={() => removeImage(index)}
+                  style={{
+                    position: 'absolute',
+                    top: '5px',
+                    right: '5px',
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    background: 'rgba(231, 76, 60, 0.9)',
+                    color: 'white',
+                    border: 'none',
+                    fontSize: '16px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 'bold'
+                  }}
+                >
+                  ×
+                </button>
+
+                <div style={{
+                  position: 'absolute',
+                  bottom: '0',
+                  left: '0',
+                  right: '0',
+                  padding: '4px 8px',
+                  background: 'rgba(0,0,0,0.7)',
+                  color: 'white',
+                  fontSize: '11px',
+                  textAlign: 'center'
+                }}>
+                  {img.uploading ? 'Загрузка...' : img.uploaded ? '✓ Загружено' : '✗ Ошибка'}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {images.length === 0 && (
+          <div style={{ 
+            fontSize: '13px', 
+            color: '#818C99',
+            textAlign: 'center',
+            padding: '20px',
+            border: '2px dashed #e0e0e0',
+            borderRadius: '8px'
+          }}>
+            📁 Нажмите "Выбрать фото" чтобы добавить изображения
+          </div>
+        )}
       </div>
 
       {/* === БЛОК ТЕГОВ === */}
@@ -475,7 +786,7 @@ export default function App() {
               fontWeight: '500'
             }}
           >
-             Добавить
+            ➕ Добавить
           </button>
         </div>
 
@@ -567,7 +878,6 @@ export default function App() {
         )}
       </div>
 
-      {/* Предпросмотр тегов */}
       {tags.length > 0 && (
         <div style={{ 
           marginBottom: '15px', 
@@ -585,7 +895,6 @@ export default function App() {
         </div>
       )}
 
-      {/* ID группы */}
       <div style={{ marginBottom: '20px' }}>
         <input
           type="text"
@@ -611,27 +920,27 @@ export default function App() {
         </div>
       </div>
 
-      {/* Кнопка публикации */}
       <button
         onClick={publishPost}
-        disabled={!post.text.trim()}
+        disabled={!post.text.trim() && images.length === 0}
         style={{
           width: '100%',
           padding: '14px',
-          background: !post.text.trim() ? '#a8b2c1' : '#4a76a8',
+          background: (!post.text.trim() && images.length === 0) ? '#a8b2c1' : '#4a76a8',
           color: 'white',
           border: 'none',
           borderRadius: '8px',
           fontSize: '17px',
           fontWeight: '600',
-          cursor: !post.text.trim() ? 'not-allowed' : 'pointer',
+          cursor: (!post.text.trim() && images.length === 0) ? 'not-allowed' : 'pointer',
           transition: 'background 0.2s'
         }}
       >
-        📤 Опубликовать {tags.length > 0 && `с ${tags.length} тег.`}
+        📤 Опубликовать
+        {images.length > 0 && ` с ${images.length} фото`}
+        {tags.length > 0 && ` и ${tags.length} тег.`}
       </button>
 
-      {/* Snackbar */}
       {snackbar && (
         <div style={{
           position: 'fixed',
