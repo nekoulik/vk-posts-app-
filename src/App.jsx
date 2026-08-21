@@ -21,29 +21,37 @@ const TEMPLATES = [
   },
   {
     id: 'article',
-    name: '📝 Статья',
+    name: ' Статья',
     text: '{заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья'
   },
   {
     id: 'product',
     name: '🛍️ Товар',
-    text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин'
+    text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n Для заказа пишите в ЛС\n\n#товар #магазин'
   },
   {
     id: 'event',
-    name: '📅 Событие',
-    text: ' Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча'
+    name: ' Событие',
+    text: ' Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча'
   },
   {
     id: 'quote',
     name: '💬 Цитата',
-    text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость'
+    text: ' {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость'
   },
   {
     id: 'contest',
     name: '🏆 Конкурс',
-    text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш'
+    text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n Приз: {приз}\n\n До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш'
   }
+];
+
+// Популярные теги для быстрого добавления
+const POPULAR_TAGS = [
+  'новости', 'важно', 'акция', 'скидки', 'конкурс',
+  'розыгрыш', 'опрос', 'вопрос', 'товар', 'магазин',
+  'статья', 'событие', 'встреча', 'цитата', 'мудрость',
+  'реклама', 'услуги', 'работа', 'вакансия', 'обучение'
 ];
 
 const DRAFT_KEY = 'vk_posts_draft';
@@ -55,6 +63,11 @@ export default function App() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [draftLoaded, setDraftLoaded] = useState(false);
+  
+  // Новые состояния для тегов
+  const [tags, setTags] = useState([]);
+  const [newTag, setNewTag] = useState('');
+  const [showPopularTags, setShowPopularTags] = useState(false);
 
   // Загрузка черновика при открытии
   useEffect(() => {
@@ -62,12 +75,12 @@ export default function App() {
       const savedDraft = localStorage.getItem(DRAFT_KEY);
       if (savedDraft) {
         const draft = JSON.parse(savedDraft);
-        // Восстанавливаем ТОЛЬКО текст и ID группы, НЕ шаблон
         if (draft.text && draft.text.trim()) {
           setPost({ text: draft.text });
           setGroupId(draft.groupId || '240736389');
+          setTags(draft.tags || []);
           setDraftLoaded(true);
-          console.log('Черновик загружен:', draft.text.substring(0, 50) + '...');
+          console.log('Черновик загружен');
         }
       }
     } catch (e) {
@@ -79,38 +92,77 @@ export default function App() {
 
   // Автосохранение при изменениях
   useEffect(() => {
-    if (post.text.trim()) {
+    if (post.text.trim() || tags.length > 0) {
       const draft = {
         text: post.text,
         groupId: groupId,
+        tags: tags,
         savedAt: new Date().toISOString()
       };
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
     }
-  }, [post.text, groupId]);
+  }, [post.text, groupId, tags]);
 
-  // Загрузка шаблона
+  // === ФУНКЦИИ ДЛЯ ТЕГОВ ===
+
+  // Добавить тег
+  const addTag = (tag) => {
+    const cleanTag = tag.trim().toLowerCase().replace(/^#/, '');
+    if (!cleanTag) return;
+    if (tags.includes(cleanTag)) {
+      setSnackbar('⚠️ Этот тег уже добавлен');
+      setTimeout(() => setSnackbar(null), 2000);
+      return;
+    }
+    setTags([...tags, cleanTag]);
+    setNewTag('');
+  };
+
+  // Удалить тег
+  const removeTag = (tagToRemove) => {
+    setTags(tags.filter(tag => tag !== tagToRemove));
+  };
+
+  // Обработка Enter в поле ввода тега
+  const handleTagKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addTag(newTag);
+    }
+  };
+
+  // Получить финальный текст поста с тегами
+  const getFinalText = () => {
+    let text = post.text.trim();
+    if (tags.length > 0) {
+      const tagsString = tags.map(t => `#${t}`).join(' ');
+      text += '\n\n' + tagsString;
+    }
+    return text;
+  };
+
+  // === ОСТАЛЬНЫЕ ФУНКЦИИ ===
+
   const loadTemplate = (template) => {
     setPost({ text: template.text });
     setSelectedTemplate(template);
     setShowTemplates(false);
-    // НЕ сохраняем сразу в черновик - даём пользователю начать работу
     setSnackbar(`✅ Шаблон "${template.name}" загружен`);
     setTimeout(() => setSnackbar(null), 3000);
   };
 
-  // Очистить всё - УДАЛЯЕТ ЧЕРНОВИК
   const clearAll = () => {
     setPost({ text: '' });
     setSelectedTemplate(null);
-    setShowTemplates(true); // Показываем шаблоны
-    localStorage.removeItem(DRAFT_KEY); // УДАЛЯЕМ ЧЕРНОВИК
+    setTags([]);
+    setNewTag('');
+    setShowTemplates(true);
+    localStorage.removeItem(DRAFT_KEY);
     setDraftLoaded(false);
     setSnackbar('🗑️ Черновик удалён');
     setTimeout(() => setSnackbar(null), 3000);
   };
 
-  // Восстановить черновик
   const restoreDraft = () => {
     try {
       const savedDraft = localStorage.getItem(DRAFT_KEY);
@@ -119,20 +171,21 @@ export default function App() {
         if (draft.text) {
           setPost({ text: draft.text });
           setGroupId(draft.groupId || '240736389');
+          setTags(draft.tags || []);
           setSnackbar('♻️ Черновик восстановлен');
           setTimeout(() => setSnackbar(null), 3000);
         }
       }
     } catch (e) {
       console.error('Ошибка восстановления:', e);
-      setSnackbar('❌ Не удалось восстановить');
-      setTimeout(() => setSnackbar(null), 3000);
     }
   };
 
   const publishPost = async () => {
-    if (!post.text.trim()) {
-      setSnackbar('️ Введите текст поста');
+    const finalText = getFinalText();
+    
+    if (!finalText.trim()) {
+      setSnackbar('⚠️ Введите текст поста');
       setTimeout(() => setSnackbar(null), 3000);
       return;
     }
@@ -152,7 +205,7 @@ export default function App() {
         method: 'wall.post',
         params: {
           owner_id: -parseInt(cleanGroupId),
-          message: post.text,
+          message: finalText,
           from_group: 1,
           access_token: SERVICE_TOKEN,
           v: '5.131'
@@ -161,12 +214,13 @@ export default function App() {
 
       console.log('Post published:', response);
       
-      // Удаляем черновик после публикации
       localStorage.removeItem(DRAFT_KEY);
       setDraftLoaded(false);
       
       setSnackbar('✅ Пост опубликован!');
       setPost({ text: '' });
+      setTags([]);
+      setNewTag('');
       setSelectedTemplate(null);
       setTimeout(() => setSnackbar(null), 3000);
     } catch (e) {
@@ -245,7 +299,7 @@ export default function App() {
           {showTemplates ? '🙈 Скрыть шаблоны' : '📋 Выбрать шаблон'}
         </button>
         
-        {(post.text || draftLoaded) && (
+        {(post.text || draftLoaded || tags.length > 0) && (
           <button
             onClick={clearAll}
             style={{
@@ -296,18 +350,6 @@ export default function App() {
                   textAlign: 'left',
                   transition: 'all 0.2s',
                   fontWeight: selectedTemplate?.id === template.id ? '600' : '400'
-                }}
-                onMouseEnter={(e) => {
-                  if (selectedTemplate?.id !== template.id) {
-                    e.target.style.borderColor = '#6c5ce7';
-                    e.target.style.background = '#f0f0ff';
-                  }
-                }}
-                onMouseLeave={(e) => {
-                  if (selectedTemplate?.id !== template.id) {
-                    e.target.style.borderColor = '#e0e0e0';
-                    e.target.style.background = 'white';
-                  }
                 }}
               >
                 {template.name}
@@ -378,6 +420,182 @@ export default function App() {
         </div>
       </div>
 
+      {/* === БЛОК ТЕГОВ === */}
+      <div style={{ 
+        marginBottom: '20px', 
+        padding: '15px', 
+        background: '#f8f9fa',
+        borderRadius: '12px',
+        border: '1px solid #e0e0e0'
+      }}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center',
+          marginBottom: '12px'
+        }}>
+          <h3 style={{ margin: 0, fontSize: '16px', color: '#333' }}>
+            🏷️ Теги ({tags.length})
+          </h3>
+          <button
+            onClick={() => setShowPopularTags(!showPopularTags)}
+            style={{
+              padding: '6px 12px',
+              background: showPopularTags ? '#6c5ce7' : 'white',
+              color: showPopularTags ? 'white' : '#6c5ce7',
+              border: '1px solid #6c5ce7',
+              borderRadius: '6px',
+              fontSize: '13px',
+              cursor: 'pointer'
+            }}
+          >
+            {showPopularTags ? '🙈 Скрыть популярные' : '⭐ Популярные теги'}
+          </button>
+        </div>
+
+        {/* Поле ввода нового тега */}
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+          <input
+            type="text"
+            placeholder="Введите тег и нажмите Enter (например: новости)"
+            value={newTag}
+            onChange={(e) => setNewTag(e.target.value)}
+            onKeyDown={handleTagKeyDown}
+            style={{ 
+              flex: 1,
+              padding: '10px 12px',
+              fontSize: '14px',
+              border: '1px solid #dfe1e5',
+              borderRadius: '6px',
+              boxSizing: 'border-box'
+            }}
+          />
+          <button
+            onClick={() => addTag(newTag)}
+            disabled={!newTag.trim()}
+            style={{
+              padding: '10px 16px',
+              background: !newTag.trim() ? '#a8b2c1' : '#6c5ce7',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '14px',
+              cursor: !newTag.trim() ? 'not-allowed' : 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            ➕ Добавить
+          </button>
+        </div>
+
+        {/* Популярные теги */}
+        {showPopularTags && (
+          <div style={{ 
+            marginBottom: '12px',
+            padding: '10px',
+            background: 'white',
+            borderRadius: '6px',
+            border: '1px solid #e0e0e0'
+          }}>
+            <div style={{ fontSize: '12px', color: '#818C99', marginBottom: '8px' }}>
+              Нажмите на тег, чтобы добавить:
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {POPULAR_TAGS.map((tag) => {
+                const isAdded = tags.includes(tag);
+                return (
+                  <button
+                    key={tag}
+                    onClick={() => !isAdded && addTag(tag)}
+                    disabled={isAdded}
+                    style={{
+                      padding: '6px 12px',
+                      background: isAdded ? '#e0e0e0' : '#f0f0ff',
+                      color: isAdded ? '#999' : '#6c5ce7',
+                      border: `1px solid ${isAdded ? '#ccc' : '#6c5ce7'}`,
+                      borderRadius: '16px',
+                      fontSize: '13px',
+                      cursor: isAdded ? 'not-allowed' : 'pointer',
+                      textDecoration: isAdded ? 'line-through' : 'none'
+                    }}
+                  >
+                    #{tag}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Отображение добавленных тегов (чипы) */}
+        {tags.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {tags.map((tag) => (
+              <div
+                key={tag}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  background: '#6c5ce7',
+                  color: 'white',
+                  borderRadius: '16px',
+                  fontSize: '13px',
+                  fontWeight: '500'
+                }}
+              >
+                <span>#{tag}</span>
+                <button
+                  onClick={() => removeTag(tag)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'white',
+                    cursor: 'pointer',
+                    fontSize: '16px',
+                    padding: '0 2px',
+                    lineHeight: 1,
+                    fontWeight: 'bold'
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {tags.length === 0 && (
+          <div style={{ 
+            fontSize: '13px', 
+            color: '#818C99',
+            textAlign: 'center',
+            padding: '10px'
+          }}>
+            Теги не добавлены. Они будут автоматически добавлены в конец поста при публикации.
+          </div>
+        )}
+      </div>
+
+      {/* Предпросмотр тегов в посте */}
+      {tags.length > 0 && (
+        <div style={{ 
+          marginBottom: '15px', 
+          padding: '10px 15px', 
+          background: '#e8f5e9',
+          borderRadius: '8px',
+          border: '1px solid #4caf50',
+          fontSize: '13px',
+          color: '#2e7d32'
+        }}>
+          <strong>👁️ Будет добавлено в конец поста:</strong>
+          <div style={{ marginTop: '5px', fontStyle: 'italic' }}>
+            {tags.map(t => `#${t}`).join(' ')}
+          </div>
+        </div>
+      )}
+
       {/* ID группы */}
       <div style={{ marginBottom: '20px' }}>
         <input
@@ -421,7 +639,7 @@ export default function App() {
           transition: 'background 0.2s'
         }}
       >
-        📤 Опубликовать
+        📤 Опубликовать {tags.length > 0 && `с ${tags.length} тег.`}
       </button>
 
       {/* Snackbar */}
