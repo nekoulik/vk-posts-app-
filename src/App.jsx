@@ -14,7 +14,7 @@ const TEMPLATES = [
   {
     id: 'promo',
     name: '🎉 Акция',
-    text: '🎉 АКЦИЯ!\n\n{название акции}\n\n С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки'
+    text: '🎉 АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки'
   },
   {
     id: 'question',
@@ -29,24 +29,27 @@ const TEMPLATES = [
   {
     id: 'product',
     name: '🛍️ Товар',
-    text: '️ {название товара}\n\n Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин'
+    text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин'
   },
   {
     id: 'event',
-    name: ' Событие',
-    text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча'
+    name: '📅 Событие',
+    text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча'
   },
   {
     id: 'quote',
     name: '💬 Цитата',
-    text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость'
+    text: ' {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость'
   },
   {
     id: 'contest',
     name: '🏆 Конкурс',
-    text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш'
+    text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n Приз: {приз}\n\n До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш'
   }
 ];
+
+// Ключ для localStorage
+const DRAFT_KEY = 'vk_posts_draft';
 
 export default function App() {
   const [post, setPost] = useState({ text: '' });
@@ -54,16 +57,47 @@ export default function App() {
   const [groupId, setGroupId] = useState('240736389');
   const [showTemplates, setShowTemplates] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
+  const [hasDraft, setHasDraft] = useState(false);
 
+  // Загрузка черновика при открытии приложения
   useEffect(() => {
-    vkBridge.send('VKWebAppInit')
-      .then(() => {
-        console.log('VK Bridge initialized');
-      })
-      .catch((error) => {
-        console.error('Init error:', error);
-      });
+    try {
+      const savedDraft = localStorage.getItem(DRAFT_KEY);
+      if (savedDraft) {
+        const draft = JSON.parse(savedDraft);
+        if (draft.text) {
+          setPost({ text: draft.text });
+          setHasDraft(true);
+          console.log('Черновик восстановлен');
+        }
+        if (draft.groupId) {
+          setGroupId(draft.groupId);
+        }
+        if (draft.templateId) {
+          const template = TEMPLATES.find(t => t.id === draft.templateId);
+          if (template) {
+            setSelectedTemplate(template);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('Ошибка загрузки черновика:', e);
+    }
+
+    vkBridge.send('VKWebAppInit').catch(console.error);
   }, []);
+
+  // Автосохранение черновика при изменениях
+  useEffect(() => {
+    const draft = {
+      text: post.text,
+      groupId: groupId,
+      templateId: selectedTemplate?.id || null,
+      savedAt: new Date().toISOString()
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    setHasDraft(true);
+  }, [post.text, groupId, selectedTemplate]);
 
   // Загрузка шаблона
   const loadTemplate = (template) => {
@@ -74,15 +108,39 @@ export default function App() {
     setTimeout(() => setSnackbar(null), 3000);
   };
 
-  // Очистить текст
+  // Очистить текст и черновик
   const clearText = () => {
     setPost({ text: '' });
     setSelectedTemplate(null);
+    localStorage.removeItem(DRAFT_KEY);
+    setHasDraft(false);
+    setSnackbar('️ Черновик удалён');
+    setTimeout(() => setSnackbar(null), 3000);
+  };
+
+  // Восстановить черновик (если был очищен)
+  const restoreDraft = () => {
+    try {
+      const savedDraft = localStorage.getItem(DRAFT_KEY);
+      if (savedDraft) {
+        const draft = JSON.parse(savedDraft);
+        if (draft.text) setPost({ text: draft.text });
+        if (draft.groupId) setGroupId(draft.groupId);
+        if (draft.templateId) {
+          const template = TEMPLATES.find(t => t.id === draft.templateId);
+          if (template) setSelectedTemplate(template);
+        }
+        setSnackbar('♻️ Черновик восстановлен');
+        setTimeout(() => setSnackbar(null), 3000);
+      }
+    } catch (e) {
+      console.error('Ошибка восстановления:', e);
+    }
   };
 
   const publishPost = async () => {
     if (!post.text.trim()) {
-      setSnackbar('⚠️ Введите текст поста');
+      setSnackbar('️ Введите текст поста');
       setTimeout(() => setSnackbar(null), 3000);
       return;
     }
@@ -93,13 +151,11 @@ export default function App() {
       return;
     }
 
-    // Убираем минус если есть
     const cleanGroupId = groupId.replace('-', '');
 
     try {
       setSnackbar('⏳ Публикация...');
 
-      // Используем VK Bridge (обходит CORS)
       const response = await vkBridge.send('VKWebAppCallAPIMethod', {
         method: 'wall.post',
         params: {
@@ -112,6 +168,11 @@ export default function App() {
       });
 
       console.log('Post published:', response);
+      
+      // Очищаем черновик после успешной публикации
+      localStorage.removeItem(DRAFT_KEY);
+      setHasDraft(false);
+      
       setSnackbar('✅ Пост опубликован!');
       setPost({ text: '' });
       setSelectedTemplate(null);
@@ -140,6 +201,40 @@ export default function App() {
         Редактор поста
       </h2>
 
+      {/* Индикатор черновика */}
+      {hasDraft && post.text && (
+        <div style={{ 
+          marginBottom: '15px', 
+          padding: '10px 15px', 
+          background: '#fff3cd',
+          border: '1px solid #ffc107',
+          borderRadius: '8px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontSize: '14px'
+        }}>
+          <span style={{ color: '#856404' }}>
+            💾 Есть сохранённый черновик
+          </span>
+          <button
+            onClick={restoreDraft}
+            style={{
+              padding: '6px 12px',
+              background: '#ffc107',
+              color: '#856404',
+              border: 'none',
+              borderRadius: '6px',
+              fontSize: '13px',
+              cursor: 'pointer',
+              fontWeight: '500'
+            }}
+          >
+            ♻️ Восстановить
+          </button>
+        </div>
+      )}
+
       {/* Кнопки управления */}
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         <button
@@ -155,10 +250,10 @@ export default function App() {
             fontWeight: '500'
           }}
         >
-          {showTemplates ? ' Скрыть шаблоны' : '📋 Выбрать шаблон'}
+          {showTemplates ? '🙈 Скрыть шаблоны' : '📋 Выбрать шаблон'}
         </button>
         
-        {post.text && (
+        {(post.text || hasDraft) && (
           <button
             onClick={clearText}
             style={{
@@ -172,7 +267,7 @@ export default function App() {
               fontWeight: '500'
             }}
           >
-            🗑️ Очистить
+            🗑️ Очистить всё
           </button>
         )}
       </div>
@@ -287,7 +382,7 @@ export default function App() {
           marginTop: '8px',
           textAlign: 'right'
         }}>
-          Символов: {post.text.length}
+          Символов: {post.text.length} {hasDraft && '• 💾 автосохранено'}
         </div>
       </div>
 
