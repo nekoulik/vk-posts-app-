@@ -77,7 +77,7 @@ export default function App() {
     }
   }, [post.text, groupId, tags, images]);
 
-    // === ЗАГРУЗКА ФОТО ЧЕРЕЗ VK BRIDGE (ИСПРАВЛЕННАЯ) ===
+    // === ЗАГРУЗКА ФОТО (с токеном пользователя) ===
   const handleFileSelect = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -92,6 +92,22 @@ export default function App() {
 
     try {
       const cleanGroupId = groupId.replace('-', '');
+
+      // ШАГ 0: Получаем токен пользователя через VK Bridge
+      setSnackbar(' Получение прав на загрузку фото...');
+      
+      let userToken = SERVICE_TOKEN; // fallback
+      
+      try {
+        const tokenResponse = await vkBridge.send('VKWebAppGetAuthToken', {
+          app_id: 54729099,
+          scope: 'photos,wall'
+        });
+        userToken = tokenResponse.access_token;
+        console.log('User token received');
+      } catch (tokenError) {
+        console.warn('Не удалось получить токен пользователя, используем сервисный:', tokenError);
+      }
 
       for (const file of files) {
         if (file.size > 5 * 1024 * 1024) {
@@ -108,12 +124,12 @@ export default function App() {
         }]);
 
         try {
-          // ШАГ 1: Получаем URL сервера загрузки
+          // ШАГ 1: Получаем URL сервера загрузки (с токеном пользователя!)
           const uploadServerResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.getWallUploadServer',
             params: {
               group_id: cleanGroupId,
-              access_token: SERVICE_TOKEN,
+              access_token: userToken,
               v: '5.131'
             }
           });
@@ -133,7 +149,7 @@ export default function App() {
           const uploadData = await uploadResponse.json();
           console.log('Upload data:', uploadData);
 
-          // ШАГ 3: Сохраняем фото в альбоме стены через VK Bridge
+          // ШАГ 3: Сохраняем фото (с токеном пользователя!)
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.saveWallPhoto',
             params: {
@@ -141,7 +157,7 @@ export default function App() {
               photo: uploadData.photo,
               server: uploadData.server,
               hash: uploadData.hash,
-              access_token: SERVICE_TOKEN,
+              access_token: userToken,
               v: '5.131'
             }
           });
@@ -161,7 +177,7 @@ export default function App() {
 
         } catch (uploadError) {
           console.error('Ошибка загрузки фото:', uploadError);
-          const errorMsg = uploadError.error_data?.error_reason || uploadError.error_msg || uploadError.message;
+          const errorMsg = uploadError.error_data?.error_msg || uploadError.error_msg || uploadError.message || 'Неизвестная ошибка';
           setSnackbar(`❌ Не удалось загрузить "${file.name}": ${errorMsg}`);
           setTimeout(() => setSnackbar(null), 4000);
           setImages(prev => prev.filter(img => img.tempId !== tempId));
