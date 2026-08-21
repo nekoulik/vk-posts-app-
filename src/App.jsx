@@ -26,11 +26,11 @@ export default function App() {
     const ownerId = groupId ? parseInt(groupId) : -240736389;
 
     try {
-      setSnackbar('🔑 Получение токена...');
+      setSnackbar(' Получение токена...');
 
       const tokenResponse = await vkBridge.send('VKWebAppGetAuthToken', {
         app_id: 54729099,
-        scopes: 'wall'
+        scope: 'wall'  // ← ИСПРАВЛЕНО: было scopes, стало scope
       });
 
       const accessToken = tokenResponse.access_token;
