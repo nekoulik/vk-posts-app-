@@ -77,7 +77,7 @@ export default function App() {
     }
   }, [post.text, groupId, tags, images]);
 
-    // === ЗАГРУЗКА ФОТО (с токеном пользователя) ===
+    // === ЗАГРУЗКА ФОТО (через форму, без CORS) ===
   const handleFileSelect = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
@@ -93,10 +93,10 @@ export default function App() {
     try {
       const cleanGroupId = groupId.replace('-', '');
 
-      // ШАГ 0: Получаем токен пользователя через VK Bridge
+      // ШАГ 0: Получаем токен пользователя
       setSnackbar('⏳ Получение прав на загрузку фото...');
       
-      let userToken = SERVICE_TOKEN; // fallback
+      let userToken = SERVICE_TOKEN;
       
       try {
         const tokenResponse = await vkBridge.send('VKWebAppGetAuthToken', {
@@ -106,7 +106,7 @@ export default function App() {
         userToken = tokenResponse.access_token;
         console.log('User token received');
       } catch (tokenError) {
-        console.warn('Не удалось получить токен пользователя, используем сервисный:', tokenError);
+        console.warn('Не удалось получить токен пользователя:', tokenError);
       }
 
       for (const file of files) {
@@ -134,40 +134,31 @@ export default function App() {
             }
           });
 
-          // ✅ ИСПРАВЛЕНИЕ: Читаем из response.upload_url
-          const uploadUrl = uploadServerResponse.response?.upload_url || uploadServerResponse.upload_url;
+          const uploadData = uploadServerResponse.response || uploadServerResponse;
+          const uploadUrl = uploadData.upload_url;
           console.log('Upload URL:', uploadUrl);
 
           if (!uploadUrl) {
-            throw new Error('Не получен upload_url от VK');
+            throw new Error('Не получен upload_url');
           }
 
-          // ШАГ 2: Загружаем файл напрямую на этот URL
-          const formData = new FormData();
-          formData.append('photo', file);
-          
-          const uploadResponse = await fetch(uploadUrl, {
-            method: 'POST',
-            body: formData
-          });
-          
-          const uploadData = await uploadResponse.json();
-          console.log('Upload data:', uploadData);
+          // ШАГ 2: Загружаем через скрытую форму (обходит CORS)
+          const uploadResult = await uploadViaIframe(uploadUrl, file);
+          console.log('Upload result:', uploadResult);
 
           // ШАГ 3: Сохраняем фото
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.saveWallPhoto',
             params: {
               group_id: cleanGroupId,
-              photo: uploadData.photo,
-              server: uploadData.server,
-              hash: uploadData.hash,
+              photo: uploadResult.photo,
+              server: uploadResult.server,
+              hash: uploadResult.hash,
               access_token: userToken,
               v: '5.131'
             }
           });
 
-          // ✅ ИСПРАВЛЕНИЕ: Читаем из response[0]
           const savedPhoto = savedResponse.response?.[0] || savedResponse[0];
           console.log('Saved photo:', savedPhoto);
 
@@ -205,6 +196,93 @@ export default function App() {
         fileInputRef.current.value = '';
       }
     }
+  };
+
+  // Вспомогательная функция для загрузки через iframe
+  const uploadViaIframe = (uploadUrl, file) => {
+    return new Promise((resolve, reject) => {
+      const iframe = document.createElement('iframe');
+      iframe.name = 'upload_iframe_' + Date.now();
+      iframe.style.display = 'none';
+      document.body.appendChild(iframe);
+
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = uploadUrl;
+      form.target = iframe.name;
+      form.enctype = 'multipart/form-data';
+
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.name = 'photo';
+      fileInput.accept = 'image/*';
+      
+      // Копируем файл через DataTransfer
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      fileInput.files = dataTransfer.files;
+
+      form.appendChild(fileInput);
+      document.body.appendChild(form);
+
+      // Обработка ответа
+      iframe.onload = async () => {
+        try {
+          const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+          const responseText = iframeDoc.body.innerText || iframeDoc.body.textContent;
+          
+          if (responseText) {
+            const result = JSON.parse(responseText);
+            resolve(result);
+          } else {
+            // Если iframe пустой, пробуем через setTimeout
+            setTimeout(() => {
+              try {
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                const text = doc.body.innerText || doc.body.textContent;
+                if (text) {
+                  resolve(JSON.parse(text));
+                } else {
+                  reject(new Error('Пустой ответ от сервера'));
+                }
+              } catch (e) {
+                reject(e);
+              }
+            }, 1000);
+          }
+          
+          // Очистка
+          setTimeout(() => {
+            document.body.removeChild(iframe);
+            document.body.removeChild(form);
+          }, 1000);
+        } catch (error) {
+          reject(error);
+          document.body.removeChild(iframe);
+          document.body.removeChild(form);
+        }
+      };
+
+      iframe.onerror = () => {
+        reject(new Error('Ошибка iframe'));
+        document.body.removeChild(iframe);
+        document.body.removeChild(form);
+      };
+
+      // Отправляем форму
+      setTimeout(() => {
+        form.submit();
+      }, 100);
+
+      // Таймаут на случай если ничего не произошло
+      setTimeout(() => {
+        reject(new Error('Таймаут загрузки'));
+        try {
+          document.body.removeChild(iframe);
+          document.body.removeChild(form);
+        } catch(e) {}
+      }, 30000);
+    });
   };
 
   const removeImage = (index) => {
