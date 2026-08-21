@@ -38,14 +38,27 @@ export default function App() {
     const ownerId = groupId ? parseInt(groupId) : -240736389;
 
     try {
+      setSnackbar('🔑 Получение токена...');
+
+      // Получаем токен доступа
+      const tokenResponse = await vkBridge.send('VKWebAppGetAccessToken', {
+        app_id: 54729099,
+        scope: 'wall,groups'
+      });
+
+      const accessToken = tokenResponse.access_token;
+      console.log('Token received');
+
       setSnackbar('⏳ Публикация...');
 
+      // Публикуем пост с токеном
       const response = await vkBridge.send('VKWebAppCallAPIMethod', {
         method: 'wall.post',
         params: {
           owner_id: ownerId,
           message: post.text,
           from_group: 1,
+          access_token: accessToken,
         },
       });
 
