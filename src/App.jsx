@@ -100,7 +100,7 @@ export default function App() {
       
       try {
         const tokenResponse = await vkBridge.send('VKWebAppGetAuthToken', {
-          app_id: 54729099,
+          app_id: 54729099, // <-- Вставьте сюда ID
           scope: 'photos,wall'
         });
         userToken = tokenResponse.access_token;
