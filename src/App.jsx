@@ -30,47 +30,47 @@ export default function App() {
   }, []);
 
   const publishPost = async () => {
-    if (!post.text.trim()) {
-      setSnackbar('⚠️ Введите текст поста');
-      return;
-    }
+  if (!post.text.trim()) {
+    setSnackbar('️ Введите текст поста');
+    return;
+  }
 
-    const ownerId = groupId ? parseInt(groupId) : -240736389;
+  const ownerId = groupId ? parseInt(groupId) : -240736389;
 
-    try {
-      setSnackbar('🔑 Получение токена...');
+  try {
+    setSnackbar('🔑 Получение токена...');
 
-      // Получаем токен доступа
-      const tokenResponse = await vkBridge.send('VKWebAppGetAccessToken', {
-        app_id: 54729099,
-        scope: 'wall,groups'
-      });
+    // Для веб-версии используем VKWebAppGetAuthToken
+    const tokenResponse = await vkBridge.send('VKWebAppGetAuthToken', {
+      app_id: 54729099,
+      scope: 'wall,groups,offline'
+    });
 
-      const accessToken = tokenResponse.access_token;
-      console.log('Token received');
+    const accessToken = tokenResponse.access_token;
+    console.log('Token received');
 
-      setSnackbar('⏳ Публикация...');
+    setSnackbar('⏳ Публикация...');
 
-      // Публикуем пост с токеном
-      const response = await vkBridge.send('VKWebAppCallAPIMethod', {
-        method: 'wall.post',
-        params: {
-          owner_id: ownerId,
-          message: post.text,
-          from_group: 1,
-          access_token: accessToken,
-        },
-      });
+    const response = await vkBridge.send('VKWebAppCallAPIMethod', {
+      method: 'wall.post',
+      params: {
+        owner_id: ownerId,
+        message: post.text,
+        from_group: 1,
+        access_token: accessToken,
+        v: '5.131'
+      },
+    });
 
-      console.log('Post published:', response);
-      setSnackbar('✅ Пост опубликован!');
-      setPost({ text: '' });
-    } catch (e) {
-      console.error('Full error:', e);
-      const errorMsg = e.error_data?.error_reason || e.error_msg || 'Неизвестная ошибка';
-      setSnackbar('❌ Ошибка: ' + errorMsg);
-    }
-  };
+    console.log('Post published:', response);
+    setSnackbar('✅ Пост опубликован!');
+    setPost({ text: '' });
+  } catch (e) {
+    console.error('Full error:', e);
+    const errorMsg = e.error_data?.error_reason || e.error_msg || 'Неизвестная ошибка';
+    setSnackbar('❌ Ошибка: ' + errorMsg);
+  }
+};
 
   if (fetching) {
     return <ScreenSpinner size="large" />;
