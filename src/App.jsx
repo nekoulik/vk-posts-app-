@@ -8,11 +8,11 @@ const PHOTO_ALBUM_ID = '312101029';
 
 const TEMPLATES = [
   { id: 'news', name: '📢 Новость', text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
-  { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
+  { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
   { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
-  { id: 'article', name: ' Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
-  { id: 'product', name: '️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
-  { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
+  { id: 'article', name: '📝 Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
+  { id: 'product', name: '️ Товар', text: '️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
+  { id: 'event', name: ' Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
   { id: 'quote', name: '💬 Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
   { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n Приз: {приз}\n\n До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
 ];
@@ -148,52 +148,37 @@ export default function App() {
           if (!uploadResponse.ok) throw new Error(`Upload failed: ${uploadResponse.status}`);
 
           const uploadResult = await uploadResponse.json();
-          console.log(' Полный ответ от Vercel API:', uploadResult);
+          console.log('📤 Полный ответ от Vercel API:', uploadResult);
           console.log('Ключи в ответе:', Object.keys(uploadResult));
 
-          //  ШАГ 3: Извлекаем данные правильно
-          // VK может вернуть данные в разных форматах
-          let photoData, server, hash;
-          
-          if (uploadResult.response) {
-            // Формат: { response: { photo: "...", server: "...", hash: "..." } }
-            photoData = uploadResult.response.photo;
-            server = uploadResult.response.server;
-            hash = uploadResult.response.hash;
-          } else if (uploadResult.photo) {
-            // Формат: { photo: "...", server: "...", hash: "..." }
-            photoData = uploadResult.photo;
-            server = uploadResult.server;
-            hash = uploadResult.hash;
-          } else {
-            // Прямой ответ от VK
-            photoData = uploadResult.photo;
-            server = uploadResult.server;
-            hash = uploadResult.hash;
-          }
+          // 🔥 ШАГ 3: Извлекаем данные правильно
+          // VK возвращает: { aid, gid, hash, photos_list, server }
+          let photoData = uploadResult.photos_list;  // ← photos_list, не photo!
+          let server = uploadResult.server;
+          let hash = uploadResult.hash;
 
           console.log('📦 Извлечённые данные:');
-          console.log('  photo:', photoData);
+          console.log('  photos_list:', photoData);
           console.log('  server:', server);
           console.log('  hash:', hash);
 
           if (!photoData || !server || !hash) {
-            throw new Error(`Неполные данные от сервера: photo=${photoData}, server=${server}, hash=${hash}`);
+            throw new Error(`Неполные данные от сервера: photos_list=${photoData}, server=${server}, hash=${hash}`);
           }
 
-          // Парсим photo, если он пришёл как строка
+          // Парсим photos_list, если он пришёл как строка
           if (typeof photoData === 'string') {
             try {
               const parsed = JSON.parse(photoData);
-              console.log('✅ Распарсили photo из JSON:', parsed);
+              console.log('✅ Распарсили photos_list из JSON:', parsed);
               
+              // photos_list — это массив, берём первый элемент
               if (Array.isArray(parsed) && parsed.length > 0) {
                 photoData = parsed[0];
-              } else if (parsed.photos_list) {
-                photoData = parsed.photos_list;
+                console.log(' Берём первый элемент:', photoData);
               }
             } catch (e) {
-              console.error('Не удалось распарсить photo:', e);
+              console.error('❌ Не удалось распарсить photos_list:', e);
             }
           }
 
@@ -340,7 +325,7 @@ export default function App() {
     const finalText = getFinalText();
     
     if (!finalText.trim() && images.length === 0) {
-      setSnackbar('⚠️ Введите текст или добавьте фото');
+      setSnackbar('️ Введите текст или добавьте фото');
       setTimeout(() => setSnackbar(null), 3000);
       return;
     }
@@ -360,7 +345,7 @@ export default function App() {
     const cleanGroupId = groupId.replace('-', '');
 
     try {
-      setSnackbar(' Публикация...');
+      setSnackbar('⏳ Публикация...');
 
       let attachments = '';
       if (images.length > 0) {
@@ -413,7 +398,7 @@ export default function App() {
     } catch (e) {
       console.error('❌ Full error при публикации:', e);
       const errorMsg = e.error_data?.error_msg || e.error_data?.error_reason || e.error_msg || 'Неизвестная ошибка';
-      setSnackbar('❌ Ошибка: ' + errorMsg);
+      setSnackbar(' Ошибка: ' + errorMsg);
       setTimeout(() => setSnackbar(null), 5000);
     }
   };
@@ -434,7 +419,7 @@ export default function App() {
           {showTemplates ? '🙈 Скрыть шаблоны' : '📋 Выбрать шаблон'}
         </button>
         {(post.text || draftLoaded || tags.length > 0 || images.length > 0) && (
-          <button onClick={clearAll} style={{ padding: '10px 20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>️ Очистить всё</button>
+          <button onClick={clearAll} style={{ padding: '10px 20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>🗑️ Очистить всё</button>
         )}
       </div>
 
@@ -488,7 +473,7 @@ export default function App() {
           </div>
         )}
         {images.length === 0 && (
-          <div style={{ fontSize: '13px', color: '#818C99', textAlign: 'center', padding: '20px', border: '2px dashed #e0e0e0', borderRadius: '8px' }}>📁 Нажмите "Выбрать фото" чтобы добавить изображения</div>
+          <div style={{ fontSize: '13px', color: '#818C99', textAlign: 'center', padding: '20px', border: '2px dashed #e0e0e0', borderRadius: '8px' }}> Нажмите "Выбрать фото" чтобы добавить изображения</div>
         )}
       </div>
 
@@ -531,7 +516,7 @@ export default function App() {
 
       {tags.length > 0 && (
         <div style={{ marginBottom: '15px', padding: '10px 15px', background: '#e8f5e9', borderRadius: '8px', border: '1px solid #4caf50', fontSize: '13px', color: '#2e7d32' }}>
-          <strong>️ Будет добавлено в конец поста:</strong>
+          <strong>👁️ Будет добавлено в конец поста:</strong>
           <div style={{ marginTop: '5px', fontStyle: 'italic' }}>{tags.map(t => `#${t}`).join(' ')}</div>
         </div>
       )}
@@ -542,11 +527,11 @@ export default function App() {
       </div>
 
       <button onClick={publishPost} disabled={!post.text.trim() && images.length === 0} style={{ width: '100%', padding: '14px', background: (!post.text.trim() && images.length === 0) ? '#a8b2c1' : '#4a76a8', color: 'white', border: 'none', borderRadius: '8px', fontSize: '17px', fontWeight: '600', cursor: (!post.text.trim() && images.length === 0) ? 'not-allowed' : 'pointer', transition: 'background 0.2s' }}>
-        📤 Опубликовать{images.length > 0 && ` с ${images.length} фото`}{tags.length > 0 && ` и ${tags.length} тег.`}
+         Опубликовать{images.length > 0 && ` с ${images.length} фото`}{tags.length > 0 && ` и ${tags.length} тег.`}
       </button>
 
       {snackbar && (
-        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('⚠️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
+        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
           {snackbar}
         </div>
       )}

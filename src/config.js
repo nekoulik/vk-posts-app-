@@ -1,1 +1,0 @@
-export const WORKER_URL = 'https://vk-proxy.nekoulik.workers.dev';
