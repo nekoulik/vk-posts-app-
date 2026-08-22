@@ -3,7 +3,7 @@ import vkBridge from '@vkontakte/vk-bridge';
 
 const SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
 
-// 🔥 ID альбома для загрузки фото
+// 🔥 ID альбома для загрузки фото (создан вами ранее)
 const PHOTO_ALBUM_ID = '312101029';
 
 const TEMPLATES = [
@@ -11,7 +11,7 @@ const TEMPLATES = [
   { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
   { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
   { id: 'article', name: '📝 Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
-  { id: 'product', name: '️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
+  { id: 'product', name: '🛍️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
   { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
   { id: 'quote', name: '💬 Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
   { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
@@ -120,12 +120,12 @@ export default function App() {
         setImages(prev => [...prev, { tempId, url: previewUrl, uploading: true }]);
 
         try {
-          // 🔥 ШАГ 1: Получаем URL для загрузки в альбом группы
+          // 🔥 ШАГ 1: Получаем URL для загрузки в конкретный альбом группы
           const uploadServerResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.getUploadServer',
             params: { 
               group_id: parseInt(cleanGroupId),
-              album_id: PHOTO_ALBUM_ID,  // ← Загружаем в наш альбом!
+              album_id: PHOTO_ALBUM_ID, 
               access_token: userToken,
               v: '5.131'
             }
@@ -136,11 +136,11 @@ export default function App() {
           
           if (!uploadUrl) throw new Error('Не получен upload_url');
 
-          // 🔥 ШАГ 2: Загружаем файл
+          // 🔥 ШАГ 2: Загружаем файл ЧЕРЕЗ VERCEL API (это обходит ошибку CORS!)
           const formData = new FormData();
           formData.append('photo', file);
 
-          const uploadResponse = await fetch(uploadUrl, {
+          const uploadResponse = await fetch(`/api/upload?uploadUrl=${encodeURIComponent(uploadUrl)}`, {
             method: 'POST',
             body: formData,
           });
@@ -155,7 +155,7 @@ export default function App() {
             method: 'photos.save',
             params: {
               group_id: parseInt(cleanGroupId),
-              album_id: PHOTO_ALBUM_ID,  // ← Сохраняем в наш альбом!
+              album_id: PHOTO_ALBUM_ID,
               photo: uploadResult.photo,
               server: uploadResult.server,
               hash: uploadResult.hash,
@@ -192,7 +192,7 @@ export default function App() {
             } : img
           ));
 
-          console.log(`✅ Photo saved to album ${PHOTO_ALBUM_ID}: ${savedPhoto.owner_id}_${savedPhoto.id}`);
+          console.log(`✅ Фото сохранено в альбом ${PHOTO_ALBUM_ID}: ${savedPhoto.owner_id}_${savedPhoto.id}`);
 
         } catch (uploadError) {
           console.error('❌ Ошибка загрузки фото:', uploadError);
@@ -312,7 +312,7 @@ export default function App() {
     const cleanGroupId = groupId.replace('-', '');
 
     try {
-      setSnackbar(' Публикация...');
+      setSnackbar('⏳ Публикация...');
 
       let attachments = '';
       if (images.length > 0) {
@@ -327,7 +327,7 @@ export default function App() {
         });
         
         attachments = photoIds.join(',');
-        console.log(' Итоговая строка attachments:', attachments);
+        console.log('📎 Итоговая строка attachments:', attachments);
       }
 
       const params = {
@@ -386,7 +386,7 @@ export default function App() {
           {showTemplates ? '🙈 Скрыть шаблоны' : '📋 Выбрать шаблон'}
         </button>
         {(post.text || draftLoaded || tags.length > 0 || images.length > 0) && (
-          <button onClick={clearAll} style={{ padding: '10px 20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>️ Очистить всё</button>
+          <button onClick={clearAll} style={{ padding: '10px 20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>🗑️ Очистить всё</button>
         )}
       </div>
 
@@ -483,7 +483,7 @@ export default function App() {
 
       {tags.length > 0 && (
         <div style={{ marginBottom: '15px', padding: '10px 15px', background: '#e8f5e9', borderRadius: '8px', border: '1px solid #4caf50', fontSize: '13px', color: '#2e7d32' }}>
-          <strong>️ Будет добавлено в конец поста:</strong>
+          <strong>👁️ Будет добавлено в конец поста:</strong>
           <div style={{ marginTop: '5px', fontStyle: 'italic' }}>{tags.map(t => `#${t}`).join(' ')}</div>
         </div>
       )}
