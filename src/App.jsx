@@ -8,11 +8,11 @@ const PHOTO_ALBUM_ID = '312101029';
 
 const TEMPLATES = [
   { id: 'news', name: '📢 Новость', text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
-  { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
+  { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
   { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
-  { id: 'article', name: '📝 Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
-  { id: 'product', name: '️ Товар', text: '️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
-  { id: 'event', name: '📅 Событие', text: ' Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
+  { id: 'article', name: '📝 Статья', text: ' {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
+  { id: 'product', name: '️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
+  { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
   { id: 'quote', name: '💬 Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
   { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
 ];
@@ -83,7 +83,7 @@ export default function App() {
     if (files.length === 0) return;
 
     if (images.length + files.length > 10) {
-      setSnackbar('⚠️ Можно загрузить максимум 10 фото');
+      setSnackbar('️ Можно загрузить максимум 10 фото');
       setTimeout(() => setSnackbar(null), 3000);
       return;
     }
@@ -109,7 +109,7 @@ export default function App() {
 
       for (const file of files) {
         if (file.size > 5 * 1024 * 1024) {
-          setSnackbar(`⚠️ Файл "${file.name}" слишком большой (макс. 5MB)`);
+          setSnackbar(`️ Файл "${file.name}" слишком большой (макс. 5MB)`);
           setTimeout(() => setSnackbar(null), 3000);
           continue;
         }
@@ -166,16 +166,32 @@ export default function App() {
             throw new Error(`Неполные данные от сервера: photos_list=${photoData}, server=${server}, hash=${hash}`);
           }
 
+          // Парсим photos_list
+          if (typeof photoData === 'string') {
+            try {
+              const parsed = JSON.parse(photoData);
+              console.log('✅ Распарсили photos_list из JSON:', parsed);
+              
+              // photos_list — это массив, берём первый элемент
+              if (Array.isArray(parsed) && parsed.length > 0) {
+                photoData = parsed[0];
+                console.log('📦 Берём первый элемент массива:', photoData);
+              }
+            } catch (e) {
+              console.error('❌ Не удалось распарсить photos_list:', e);
+            }
+          }
+
           // 🔥 ШАГ 4: Сохраняем фото
-          // ВАЖНО: передаём photos_list как СТРОКУ, не распаршенный объект!
-          console.log('🚀 Отправляем photos.save с photos_list как строкой...');
+          // ВАЖНО: передаём распаршенный ОБЪЕКТ, не строку!
+          console.log('🚀 Отправляем photos.save с photoData как объектом...');
           
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.save',
             params: {
               group_id: parseInt(cleanGroupId),
               album_id: PHOTO_ALBUM_ID,
-              photo: photoData,  // ← Передаём СТРОКУ!
+              photo: photoData,  // ← Передаём ОБЪЕКТ (распаршенный)!
               server: server,
               hash: hash,
               access_token: userToken,
@@ -194,7 +210,7 @@ export default function App() {
             savedPhoto = savedResponse;
           }
 
-          console.log('🖼️ Извлечённые данные фото:', savedPhoto);
+          console.log('️ Извлечённые данные фото:', savedPhoto);
 
           if (!savedPhoto || !savedPhoto.id || !savedPhoto.owner_id) {
             throw new Error(`Не удалось получить ID фото. Получено: ${JSON.stringify(savedPhoto)}`);
@@ -384,7 +400,7 @@ export default function App() {
     } catch (e) {
       console.error('❌ Full error при публикации:', e);
       const errorMsg = e.error_data?.error_msg || e.error_data?.error_reason || e.error_msg || 'Неизвестная ошибка';
-      setSnackbar('❌ Ошибка: ' + errorMsg);
+      setSnackbar(' Ошибка: ' + errorMsg);
       setTimeout(() => setSnackbar(null), 5000);
     }
   };
@@ -472,7 +488,7 @@ export default function App() {
         </div>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
           <input type="text" placeholder="Введите тег и нажмите Enter" value={newTag} onChange={(e) => setNewTag(e.target.value)} onKeyDown={handleTagKeyDown} style={{ flex: 1, padding: '10px 12px', fontSize: '14px', border: '1px solid #dfe1e5', borderRadius: '6px', boxSizing: 'border-box' }} />
-          <button onClick={() => addTag(newTag)} disabled={!newTag.trim()} style={{ padding: '10px 16px', background: !newTag.trim() ? '#a8b2c1' : '#6c5ce7', color: 'white', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: !newTag.trim() ? 'not-allowed' : 'pointer', fontWeight: '500' }}> Добавить</button>
+          <button onClick={() => addTag(newTag)} disabled={!newTag.trim()} style={{ padding: '10px 16px', background: !newTag.trim() ? '#a8b2c1' : '#6c5ce7', color: 'white', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: !newTag.trim() ? 'not-allowed' : 'pointer', fontWeight: '500' }}>➕ Добавить</button>
         </div>
         {showPopularTags && (
           <div style={{ marginBottom: '12px', padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
@@ -517,7 +533,7 @@ export default function App() {
       </button>
 
       {snackbar && (
-        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('⚠️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
+        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
           {snackbar}
         </div>
       )}
