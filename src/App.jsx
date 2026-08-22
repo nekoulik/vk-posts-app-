@@ -11,8 +11,8 @@ const TEMPLATES = [
   { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
   { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
   { id: 'article', name: ' Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
-  { id: 'product', name: '🛍️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n Для заказа пишите в ЛС\n\n#товар #магазин' },
-  { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
+  { id: 'product', name: '️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
+  { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
   { id: 'quote', name: '💬 Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
   { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n Приз: {приз}\n\n До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
 ];
@@ -148,41 +148,52 @@ export default function App() {
           if (!uploadResponse.ok) throw new Error(`Upload failed: ${uploadResponse.status}`);
 
           const uploadResult = await uploadResponse.json();
-          console.log('📤 Результат загрузки на сервер:', uploadResult);
-          console.log('Тип photo:', typeof uploadResult.photo);
-          console.log('photo value:', uploadResult.photo);
+          console.log(' Полный ответ от Vercel API:', uploadResult);
+          console.log('Ключи в ответе:', Object.keys(uploadResult));
 
-          // 🔥 ШАГ 3: Сохраняем фото в альбоме группы
-          // Парсим photo, если он пришёл как строка
-          let photoData = uploadResult.photo;
+          //  ШАГ 3: Извлекаем данные правильно
+          // VK может вернуть данные в разных форматах
+          let photoData, server, hash;
           
+          if (uploadResult.response) {
+            // Формат: { response: { photo: "...", server: "...", hash: "..." } }
+            photoData = uploadResult.response.photo;
+            server = uploadResult.response.server;
+            hash = uploadResult.response.hash;
+          } else if (uploadResult.photo) {
+            // Формат: { photo: "...", server: "...", hash: "..." }
+            photoData = uploadResult.photo;
+            server = uploadResult.server;
+            hash = uploadResult.hash;
+          } else {
+            // Прямой ответ от VK
+            photoData = uploadResult.photo;
+            server = uploadResult.server;
+            hash = uploadResult.hash;
+          }
+
+          console.log('📦 Извлечённые данные:');
+          console.log('  photo:', photoData);
+          console.log('  server:', server);
+          console.log('  hash:', hash);
+
+          if (!photoData || !server || !hash) {
+            throw new Error(`Неполные данные от сервера: photo=${photoData}, server=${server}, hash=${hash}`);
+          }
+
+          // Парсим photo, если он пришёл как строка
           if (typeof photoData === 'string') {
             try {
-              // Пробуем распарсить JSON
               const parsed = JSON.parse(photoData);
               console.log('✅ Распарсили photo из JSON:', parsed);
               
-              // Если это массив, берём первый элемент
               if (Array.isArray(parsed) && parsed.length > 0) {
                 photoData = parsed[0];
               } else if (parsed.photos_list) {
-                // Если это объект с photos_list
                 photoData = parsed.photos_list;
               }
             } catch (e) {
-              console.error('❌ Не удалось распарсить photo:', e);
-            }
-          }
-
-          // Если photoData всё ещё строка, возможно это уже готовый JSON массив
-          if (typeof photoData === 'string') {
-            try {
-              photoData = JSON.parse(photoData);
-              if (Array.isArray(photoData) && photoData.length > 0) {
-                photoData = photoData[0];
-              }
-            } catch (e) {
-              // Оставляем как есть
+              console.error('Не удалось распарсить photo:', e);
             }
           }
 
@@ -194,8 +205,8 @@ export default function App() {
               group_id: parseInt(cleanGroupId),
               album_id: PHOTO_ALBUM_ID,
               photo: photoData,
-              server: uploadResult.server,
-              hash: uploadResult.hash,
+              server: server,
+              hash: hash,
               access_token: userToken,
               v: '5.131'
             }
@@ -413,7 +424,7 @@ export default function App() {
 
       {draftLoaded && (
         <div style={{ marginBottom: '15px', padding: '12px 15px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px' }}>
-          <span style={{ color: '#856404', fontWeight: '500' }}> Есть сохранённый черновик</span>
+          <span style={{ color: '#856404', fontWeight: '500' }}>💾 Есть сохранённый черновик</span>
           <button onClick={restoreDraft} style={{ padding: '8px 16px', background: '#ffc107', color: '#856404', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', fontWeight: '600' }}>♻️ Восстановить</button>
         </div>
       )}
@@ -423,7 +434,7 @@ export default function App() {
           {showTemplates ? '🙈 Скрыть шаблоны' : '📋 Выбрать шаблон'}
         </button>
         {(post.text || draftLoaded || tags.length > 0 || images.length > 0) && (
-          <button onClick={clearAll} style={{ padding: '10px 20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>🗑️ Очистить всё</button>
+          <button onClick={clearAll} style={{ padding: '10px 20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>️ Очистить всё</button>
         )}
       </div>
 
@@ -520,7 +531,7 @@ export default function App() {
 
       {tags.length > 0 && (
         <div style={{ marginBottom: '15px', padding: '10px 15px', background: '#e8f5e9', borderRadius: '8px', border: '1px solid #4caf50', fontSize: '13px', color: '#2e7d32' }}>
-          <strong>👁️ Будет добавлено в конец поста:</strong>
+          <strong>️ Будет добавлено в конец поста:</strong>
           <div style={{ marginTop: '5px', fontStyle: 'italic' }}>{tags.map(t => `#${t}`).join(' ')}</div>
         </div>
       )}
@@ -535,7 +546,7 @@ export default function App() {
       </button>
 
       {snackbar && (
-        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
+        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('⚠️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
           {snackbar}
         </div>
       )}
