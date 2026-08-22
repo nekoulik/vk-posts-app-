@@ -5,13 +5,13 @@ const SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
 
 const TEMPLATES = [
   { id: 'news', name: '📢 Новость', text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
-  { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
+  { id: 'promo', name: ' Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
   { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
   { id: 'article', name: '📝 Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
-  { id: 'product', name: '️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
-  { id: 'event', name: '📅 Событие', text: ' Приглашаем на событие!\n\n{название события}\n\n️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
+  { id: 'product', name: '🛍️ Товар', text: '🛍️ {название товара}\n\n Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
+  { id: 'event', name: '📅 Событие', text: ' Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
   { id: 'quote', name: ' Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
-  { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
+  { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
 ];
 
 const POPULAR_TAGS = [
@@ -80,7 +80,7 @@ export default function App() {
     if (files.length === 0) return;
 
     if (images.length + files.length > 10) {
-      setSnackbar('⚠️ Можно загрузить максимум 10 фото');
+      setSnackbar('️ Можно загрузить максимум 10 фото');
       setTimeout(() => setSnackbar(null), 3000);
       return;
     }
@@ -117,9 +117,15 @@ export default function App() {
         setImages(prev => [...prev, { tempId, url: previewUrl, uploading: true }]);
 
         try {
+          // 🔥 ШАГ 1: Получаем URL для загрузки в альбом группы
           const uploadServerResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
-            method: 'photos.getWallUploadServer',
-            params: { group_id: cleanGroupId, access_token: userToken, v: '5.131' }
+            method: 'photos.getUploadServer',
+            params: { 
+              group_id: parseInt(cleanGroupId),
+              album_id: 'wall',  // ← Загружаем в альбом "Фото на стене"
+              access_token: userToken,
+              v: '5.131'
+            }
           });
 
           const uploadData = uploadServerResponse.response || uploadServerResponse;
@@ -127,10 +133,11 @@ export default function App() {
           
           if (!uploadUrl) throw new Error('Не получен upload_url');
 
+          // 🔥 ШАГ 2: Загружаем файл
           const formData = new FormData();
           formData.append('photo', file);
 
-          const uploadResponse = await fetch(`/api/upload?uploadUrl=${encodeURIComponent(uploadUrl)}`, {
+          const uploadResponse = await fetch(uploadUrl, {
             method: 'POST',
             body: formData,
           });
@@ -140,27 +147,21 @@ export default function App() {
           const uploadResult = await uploadResponse.json();
           console.log('📤 Результат загрузки на сервер:', uploadResult);
 
-          const pPhoto = uploadResult.photo || (uploadResult.response && uploadResult.response.photo);
-          const pServer = uploadResult.server || (uploadResult.response && uploadResult.response.server);
-          const pHash = uploadResult.hash || (uploadResult.response && uploadResult.response.hash);
-
-          if (!pPhoto || !pServer || !pHash) {
-            throw new Error('Неверный формат ответа от сервера загрузки VK');
-          }
-
+          // 🔥 ШАГ 3: Сохраняем фото в альбоме группы
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
-            method: 'photos.saveWallPhoto',
+            method: 'photos.save',
             params: {
               group_id: parseInt(cleanGroupId),
-              photo: pPhoto,
-              server: pServer,
-              hash: pHash,
+              album_id: 'wall',
+              photo: uploadResult.photo,
+              server: uploadResult.server,
+              hash: uploadResult.hash,
               access_token: userToken,
               v: '5.131'
             }
           });
 
-          console.log('💾 Сырой ответ saveWallPhoto:', savedResponse);
+          console.log('💾 Сырой ответ photos.save:', savedResponse);
 
           let savedPhoto = null;
           if (savedResponse && savedResponse.response) {
@@ -177,24 +178,21 @@ export default function App() {
             throw new Error(`Не удалось получить ID фото. Получено: ${JSON.stringify(savedPhoto)}`);
           }
 
-          // 🔥 ИСПРАВЛЕНИЕ: принудительно меняем owner_id на отрицательный (группы)!
-          const groupOwnerId = -parseInt(cleanGroupId);
-
           setImages(prev => prev.map(img => 
             img.tempId === tempId ? {
               ...img,
               id: savedPhoto.id,
-              owner_id: groupOwnerId,  // ← ОТРИЦАТЕЛЬНЫЙ ID группы!
+              owner_id: savedPhoto.owner_id,
               access_key: savedPhoto.access_key || '',
               uploading: false,
               uploaded: true
             } : img
           ));
 
-          console.log(`✅ Photo saved with owner_id: ${groupOwnerId} (was ${savedPhoto.owner_id})`);
+          console.log(`✅ Photo saved: ${savedPhoto.owner_id}_${savedPhoto.id}`);
 
         } catch (uploadError) {
-          console.error(' Ошибка загрузки фото:', uploadError);
+          console.error('❌ Ошибка загрузки фото:', uploadError);
           const errorMsg = uploadError.error_data?.error_msg || uploadError.error_msg || uploadError.message || 'Неизвестная ошибка';
           setSnackbar(`❌ Не удалось загрузить "${file.name}": ${errorMsg}`);
           setTimeout(() => setSnackbar(null), 4000);
@@ -364,7 +362,7 @@ export default function App() {
     } catch (e) {
       console.error('❌ Full error при публикации:', e);
       const errorMsg = e.error_data?.error_msg || e.error_data?.error_reason || e.error_msg || 'Неизвестная ошибка';
-      setSnackbar('❌ Ошибка: ' + errorMsg);
+      setSnackbar(' Ошибка: ' + errorMsg);
       setTimeout(() => setSnackbar(null), 5000);
     }
   };
@@ -385,7 +383,7 @@ export default function App() {
           {showTemplates ? '🙈 Скрыть шаблоны' : '📋 Выбрать шаблон'}
         </button>
         {(post.text || draftLoaded || tags.length > 0 || images.length > 0) && (
-          <button onClick={clearAll} style={{ padding: '10px 20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>🗑️ Очистить всё</button>
+          <button onClick={clearAll} style={{ padding: '10px 20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>️ Очистить всё</button>
         )}
       </div>
 
@@ -439,7 +437,7 @@ export default function App() {
           </div>
         )}
         {images.length === 0 && (
-          <div style={{ fontSize: '13px', color: '#818C99', textAlign: 'center', padding: '20px', border: '2px dashed #e0e0e0', borderRadius: '8px' }}> Нажмите "Выбрать фото" чтобы добавить изображения</div>
+          <div style={{ fontSize: '13px', color: '#818C99', textAlign: 'center', padding: '20px', border: '2px dashed #e0e0e0', borderRadius: '8px' }}>📁 Нажмите "Выбрать фото" чтобы добавить изображения</div>
         )}
       </div>
 
@@ -497,7 +495,7 @@ export default function App() {
       </button>
 
       {snackbar && (
-        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('⚠️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
+        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
           {snackbar}
         </div>
       )}
