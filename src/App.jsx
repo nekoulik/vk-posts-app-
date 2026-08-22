@@ -7,9 +7,9 @@ const TEMPLATES = [
   { id: 'news', name: '📢 Новость', text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
   { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
   { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
-  { id: 'article', name: '📝 Статья', text: ' {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
+  { id: 'article', name: '📝 Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
   { id: 'product', name: '️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
-  { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
+  { id: 'event', name: '📅 Событие', text: ' Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
   { id: 'quote', name: '💬 Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
   { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
 ];
@@ -106,7 +106,7 @@ export default function App() {
 
       for (const file of files) {
         if (file.size > 5 * 1024 * 1024) {
-          setSnackbar(`️ Файл "${file.name}" слишком большой (макс. 5MB)`);
+          setSnackbar(`⚠️ Файл "${file.name}" слишком большой (макс. 5MB)`);
           setTimeout(() => setSnackbar(null), 3000);
           continue;
         }
@@ -155,20 +155,21 @@ export default function App() {
             throw new Error(`Неполные данные: photo=${photoData}, server=${server}, hash=${hash}`);
           }
 
-          // 🔥 ШАГ 3: Сохраняем фото через saveWallPhoto с токеном группы
+          // 🔥 ШАГ 3: Сохраняем фото через photos.save (не saveWallPhoto!)
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
-            method: 'photos.saveWallPhoto',
+            method: 'photos.save',
             params: {
               group_id: parseInt(cleanGroupId),
+              album_id: 'wall',  // ← Сохраняем в альбом "Фото на стене"
               photo: photoData,
               server: server,
               hash: hash,
-              access_token: SERVICE_TOKEN,  // ← Используем токен группы!
+              access_token: SERVICE_TOKEN,  // ← Токен группы
               v: '5.131'
             }
           });
 
-          console.log('💾 Сырой ответ photos.saveWallPhoto:', savedResponse);
+          console.log('💾 Сырой ответ photos.save:', savedResponse);
 
           let savedPhoto = null;
           if (savedResponse && savedResponse.response) {
@@ -208,7 +209,7 @@ export default function App() {
       }
     } catch (error) {
       console.error('Ошибка:', error);
-      setSnackbar(' Ошибка при загрузке фото: ' + error.message);
+      setSnackbar('❌ Ошибка при загрузке фото: ' + error.message);
       setTimeout(() => setSnackbar(null), 5000);
     } finally {
       setUploading(false);
@@ -269,7 +270,7 @@ export default function App() {
     setShowTemplates(true);
     localStorage.removeItem(DRAFT_KEY);
     setDraftLoaded(false);
-    setSnackbar('️ Черновик удалён');
+    setSnackbar('🗑️ Черновик удалён');
     setTimeout(() => setSnackbar(null), 3000);
   };
 
@@ -316,7 +317,7 @@ export default function App() {
     const cleanGroupId = groupId.replace('-', '');
 
     try {
-      setSnackbar('⏳ Публикация...');
+      setSnackbar(' Публикация...');
 
       let attachments = '';
       if (images.length > 0) {
@@ -367,9 +368,9 @@ export default function App() {
       setSelectedTemplate(null);
       setTimeout(() => setSnackbar(null), 3000);
     } catch (e) {
-      console.error('❌ Full error при публикации:', e);
+      console.error(' Full error при публикации:', e);
       const errorMsg = e.error_data?.error_msg || e.error_data?.error_reason || e.error_msg || 'Неизвестная ошибка';
-      setSnackbar(' Ошибка: ' + errorMsg);
+      setSnackbar('❌ Ошибка: ' + errorMsg);
       setTimeout(() => setSnackbar(null), 5000);
     }
   };
@@ -381,7 +382,7 @@ export default function App() {
       {draftLoaded && (
         <div style={{ marginBottom: '15px', padding: '12px 15px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px' }}>
           <span style={{ color: '#856404', fontWeight: '500' }}> Есть сохранённый черновик</span>
-          <button onClick={restoreDraft} style={{ padding: '8px 16px', background: '#ffc107', color: '#856404', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', fontWeight: '600' }}>♻️ Восстановить</button>
+          <button onClick={restoreDraft} style={{ padding: '8px 16px', background: '#ffc107', color: '#856404', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', fontWeight: '600' }}>️ Восстановить</button>
         </div>
       )}
 
@@ -487,7 +488,7 @@ export default function App() {
 
       {tags.length > 0 && (
         <div style={{ marginBottom: '15px', padding: '10px 15px', background: '#e8f5e9', borderRadius: '8px', border: '1px solid #4caf50', fontSize: '13px', color: '#2e7d32' }}>
-          <strong>👁️ Будет добавлено в конец поста:</strong>
+          <strong>️ Будет добавлено в конец поста:</strong>
           <div style={{ marginTop: '5px', fontStyle: 'italic' }}>{tags.map(t => `#${t}`).join(' ')}</div>
         </div>
       )}
@@ -502,7 +503,7 @@ export default function App() {
       </button>
 
       {snackbar && (
-        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('⚠️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
+        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
           {snackbar}
         </div>
       )}
