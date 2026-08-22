@@ -5,13 +5,13 @@ const SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
 
 const TEMPLATES = [
   { id: 'news', name: '📢 Новость', text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
-  { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
+  { id: 'promo', name: '🎉 Акция', text: ' АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
   { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
   { id: 'article', name: '📝 Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
-  { id: 'product', name: '🛍️ Товар', text: '🛍️ {название товара}\n\n Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
-  { id: 'event', name: '📅 Событие', text: ' Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
-  { id: 'quote', name: ' Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
-  { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
+  { id: 'product', name: '️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
+  { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
+  { id: 'quote', name: '💬 Цитата', text: ' {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
+  { id: 'contest', name: '🏆 Конкурс', text: ' КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
 ];
 
 const POPULAR_TAGS = [
@@ -75,14 +75,12 @@ export default function App() {
     }
   }, [post.text, groupId, tags, images]);
 
-  // ... (начало файла такое же, как в предыдущем ответе)
-
   const handleFileSelect = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
     if (images.length + files.length > 10) {
-      setSnackbar('️ Можно загрузить максимум 10 фото');
+      setSnackbar('⚠️ Можно загрузить максимум 10 фото');
       setTimeout(() => setSnackbar(null), 3000);
       return;
     }
@@ -93,7 +91,6 @@ export default function App() {
     try {
       const cleanGroupId = groupId.replace('-', '');
       
-      // 🔥 Получаем токен пользователя (ОБЯЗАТЕЛЬНО для photos.getWallUploadServer!)
       let userToken = SERVICE_TOKEN;
       
       try {
@@ -151,20 +148,20 @@ export default function App() {
             throw new Error('Неверный формат ответа от сервера загрузки VK');
           }
 
-          // 🔥 Важно: передаём group_id как число!
+          // 🔥 ИСПРАВЛЕНИЕ: передаём ОТРИЦАТЕЛЬНЫЙ group_id!
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.saveWallPhoto',
             params: {
-              group_id: parseInt(cleanGroupId),  // ← Число, не строка!
+              group_id: -parseInt(cleanGroupId),
               photo: pPhoto,
               server: pServer,
               hash: pHash,
-              access_token: userToken,  // ← Токен пользователя!
+              access_token: userToken,
               v: '5.131'
             }
           });
 
-          console.log(' Сырой ответ saveWallPhoto:', savedResponse);
+          console.log('💾 Сырой ответ saveWallPhoto:', savedResponse);
 
           let savedPhoto = null;
           if (savedResponse && savedResponse.response) {
@@ -209,8 +206,6 @@ export default function App() {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
-
-// ... (остальной код без изменений)
 
   const removeImage = (index) => {
     const img = images[index];
@@ -279,7 +274,7 @@ export default function App() {
           setGroupId(draft.groupId || '240736389');
           setTags(draft.tags || []);
           if (draft.images) setImages(draft.images.map(img => ({ ...img, uploading: false })));
-          setSnackbar('️ Черновик восстановлен');
+          setSnackbar('♻️ Черновик восстановлен');
           setTimeout(() => setSnackbar(null), 3000);
         }
       }
@@ -342,7 +337,7 @@ export default function App() {
         params.attachments = attachments;
       }
 
-      console.log('🚀 ИТОГОВЫЕ ПАРАМЕТРЫ ДЛЯ wall.post:', params);
+      console.log(' ИТОГОВЫЕ ПАРАМЕТРЫ ДЛЯ wall.post:', params);
 
       const response = await vkBridge.send('VKWebAppCallAPIMethod', {
         method: 'wall.post',
@@ -377,7 +372,7 @@ export default function App() {
       {draftLoaded && (
         <div style={{ marginBottom: '15px', padding: '12px 15px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px' }}>
           <span style={{ color: '#856404', fontWeight: '500' }}>💾 Есть сохранённый черновик</span>
-          <button onClick={restoreDraft} style={{ padding: '8px 16px', background: '#ffc107', color: '#856404', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', fontWeight: '600' }}>♻️ Восстановить</button>
+          <button onClick={restoreDraft} style={{ padding: '8px 16px', background: '#ffc107', color: '#856404', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', fontWeight: '600' }}>️ Восстановить</button>
         </div>
       )}
 
@@ -392,7 +387,7 @@ export default function App() {
 
       {showTemplates && (
         <div style={{ marginBottom: '20px', padding: '20px', background: '#f8f9fa', borderRadius: '12px', border: '1px solid #e0e0e0' }}>
-          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}> Выберите шаблон:</h3>
+          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>📋 Выберите шаблон:</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
             {TEMPLATES.map((template) => (
               <button key={template.id} onClick={() => loadTemplate(template)} style={{ padding: '15px', background: selectedTemplate?.id === template.id ? '#6c5ce7' : 'white', color: selectedTemplate?.id === template.id ? 'white' : '#333', border: `2px solid ${selectedTemplate?.id === template.id ? '#6c5ce7' : '#e0e0e0'}`, borderRadius: '8px', fontSize: '14px', cursor: 'pointer', textAlign: 'left', fontWeight: selectedTemplate?.id === template.id ? '600' : '400' }}>
@@ -420,7 +415,7 @@ export default function App() {
         <div style={{ marginBottom: '15px' }}>
           <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileSelect} disabled={uploading || images.length >= 10} style={{ display: 'none' }} id="image-upload" />
           <label htmlFor="image-upload" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: images.length >= 10 ? '#a8b2c1' : uploading ? '#f0ad4e' : '#6c5ce7', color: 'white', borderRadius: '8px', fontSize: '15px', cursor: images.length >= 10 ? 'not-allowed' : 'pointer', fontWeight: '500', transition: 'background 0.2s' }}>
-            {uploading ? ' Загрузка...' : images.length >= 10 ? '📁 Максимум фото' : ' Выбрать фото'}
+            {uploading ? '⏳ Загрузка...' : images.length >= 10 ? '📁 Максимум фото' : '📁 Выбрать фото'}
           </label>
           <span style={{ marginLeft: '12px', fontSize: '13px', color: '#818C99' }}>(JPG, PNG, GIF до 5MB)</span>
         </div>
@@ -440,7 +435,7 @@ export default function App() {
           </div>
         )}
         {images.length === 0 && (
-          <div style={{ fontSize: '13px', color: '#818C99', textAlign: 'center', padding: '20px', border: '2px dashed #e0e0e0', borderRadius: '8px' }}>📁 Нажмите "Выбрать фото" чтобы добавить изображения</div>
+          <div style={{ fontSize: '13px', color: '#818C99', textAlign: 'center', padding: '20px', border: '2px dashed #e0e0e0', borderRadius: '8px' }}> Нажмите "Выбрать фото" чтобы добавить изображения</div>
         )}
       </div>
 
@@ -498,7 +493,7 @@ export default function App() {
       </button>
 
       {snackbar && (
-        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
+        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('⚠️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
           {snackbar}
         </div>
       )}
