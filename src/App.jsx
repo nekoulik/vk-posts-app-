@@ -12,9 +12,9 @@ const TEMPLATES = [
   { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
   { id: 'article', name: '📝 Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
   { id: 'product', name: '️ Товар', text: '️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
-  { id: 'event', name: ' Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
+  { id: 'event', name: '📅 Событие', text: ' Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
   { id: 'quote', name: '💬 Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
-  { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n Приз: {приз}\n\n До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
+  { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
 ];
 
 const POPULAR_TAGS = [
@@ -151,14 +151,14 @@ export default function App() {
           console.log('📤 Полный ответ от Vercel API:', uploadResult);
           console.log('Ключи в ответе:', Object.keys(uploadResult));
 
-          // 🔥 ШАГ 3: Извлекаем данные правильно
+          // 🔥 ШАГ 3: Извлекаем данные
           // VK возвращает: { aid, gid, hash, photos_list, server }
-          let photoData = uploadResult.photos_list;  // ← photos_list, не photo!
+          let photoData = uploadResult.photos_list;  // ← СТРОКА JSON
           let server = uploadResult.server;
           let hash = uploadResult.hash;
 
           console.log('📦 Извлечённые данные:');
-          console.log('  photos_list:', photoData);
+          console.log('  photos_list (строка):', photoData);
           console.log('  server:', server);
           console.log('  hash:', hash);
 
@@ -166,30 +166,16 @@ export default function App() {
             throw new Error(`Неполные данные от сервера: photos_list=${photoData}, server=${server}, hash=${hash}`);
           }
 
-          // Парсим photos_list, если он пришёл как строка
-          if (typeof photoData === 'string') {
-            try {
-              const parsed = JSON.parse(photoData);
-              console.log('✅ Распарсили photos_list из JSON:', parsed);
-              
-              // photos_list — это массив, берём первый элемент
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                photoData = parsed[0];
-                console.log(' Берём первый элемент:', photoData);
-              }
-            } catch (e) {
-              console.error('❌ Не удалось распарсить photos_list:', e);
-            }
-          }
-
-          console.log('📦 Итоговый photo для отправки:', photoData);
-
+          // 🔥 ШАГ 4: Сохраняем фото
+          // ВАЖНО: передаём photos_list как СТРОКУ, не распаршенный объект!
+          console.log('🚀 Отправляем photos.save с photos_list как строкой...');
+          
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.save',
             params: {
               group_id: parseInt(cleanGroupId),
               album_id: PHOTO_ALBUM_ID,
-              photo: photoData,
+              photo: photoData,  // ← Передаём СТРОКУ!
               server: server,
               hash: hash,
               access_token: userToken,
@@ -325,7 +311,7 @@ export default function App() {
     const finalText = getFinalText();
     
     if (!finalText.trim() && images.length === 0) {
-      setSnackbar('️ Введите текст или добавьте фото');
+      setSnackbar('⚠️ Введите текст или добавьте фото');
       setTimeout(() => setSnackbar(null), 3000);
       return;
     }
@@ -345,7 +331,7 @@ export default function App() {
     const cleanGroupId = groupId.replace('-', '');
 
     try {
-      setSnackbar('⏳ Публикация...');
+      setSnackbar(' Публикация...');
 
       let attachments = '';
       if (images.length > 0) {
@@ -398,7 +384,7 @@ export default function App() {
     } catch (e) {
       console.error('❌ Full error при публикации:', e);
       const errorMsg = e.error_data?.error_msg || e.error_data?.error_reason || e.error_msg || 'Неизвестная ошибка';
-      setSnackbar(' Ошибка: ' + errorMsg);
+      setSnackbar('❌ Ошибка: ' + errorMsg);
       setTimeout(() => setSnackbar(null), 5000);
     }
   };
@@ -473,7 +459,7 @@ export default function App() {
           </div>
         )}
         {images.length === 0 && (
-          <div style={{ fontSize: '13px', color: '#818C99', textAlign: 'center', padding: '20px', border: '2px dashed #e0e0e0', borderRadius: '8px' }}> Нажмите "Выбрать фото" чтобы добавить изображения</div>
+          <div style={{ fontSize: '13px', color: '#818C99', textAlign: 'center', padding: '20px', border: '2px dashed #e0e0e0', borderRadius: '8px' }}>📁 Нажмите "Выбрать фото" чтобы добавить изображения</div>
         )}
       </div>
 
@@ -486,7 +472,7 @@ export default function App() {
         </div>
         <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
           <input type="text" placeholder="Введите тег и нажмите Enter" value={newTag} onChange={(e) => setNewTag(e.target.value)} onKeyDown={handleTagKeyDown} style={{ flex: 1, padding: '10px 12px', fontSize: '14px', border: '1px solid #dfe1e5', borderRadius: '6px', boxSizing: 'border-box' }} />
-          <button onClick={() => addTag(newTag)} disabled={!newTag.trim()} style={{ padding: '10px 16px', background: !newTag.trim() ? '#a8b2c1' : '#6c5ce7', color: 'white', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: !newTag.trim() ? 'not-allowed' : 'pointer', fontWeight: '500' }}>➕ Добавить</button>
+          <button onClick={() => addTag(newTag)} disabled={!newTag.trim()} style={{ padding: '10px 16px', background: !newTag.trim() ? '#a8b2c1' : '#6c5ce7', color: 'white', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: !newTag.trim() ? 'not-allowed' : 'pointer', fontWeight: '500' }}> Добавить</button>
         </div>
         {showPopularTags && (
           <div style={{ marginBottom: '12px', padding: '10px', background: 'white', borderRadius: '6px', border: '1px solid #e0e0e0' }}>
@@ -527,11 +513,11 @@ export default function App() {
       </div>
 
       <button onClick={publishPost} disabled={!post.text.trim() && images.length === 0} style={{ width: '100%', padding: '14px', background: (!post.text.trim() && images.length === 0) ? '#a8b2c1' : '#4a76a8', color: 'white', border: 'none', borderRadius: '8px', fontSize: '17px', fontWeight: '600', cursor: (!post.text.trim() && images.length === 0) ? 'not-allowed' : 'pointer', transition: 'background 0.2s' }}>
-         Опубликовать{images.length > 0 && ` с ${images.length} фото`}{tags.length > 0 && ` и ${tags.length} тег.`}
+        📤 Опубликовать{images.length > 0 && ` с ${images.length} фото`}{tags.length > 0 && ` и ${tags.length} тег.`}
       </button>
 
       {snackbar && (
-        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
+        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('⚠️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
           {snackbar}
         </div>
       )}
