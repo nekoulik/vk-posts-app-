@@ -3,14 +3,17 @@ import vkBridge from '@vkontakte/vk-bridge';
 
 const SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
 
+// 🔥 ID альбома для загрузки фото
+const PHOTO_ALBUM_ID = '312101029';
+
 const TEMPLATES = [
   { id: 'news', name: '📢 Новость', text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
-  { id: 'promo', name: ' Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
+  { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
   { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
   { id: 'article', name: '📝 Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
-  { id: 'product', name: '🛍️ Товар', text: '🛍️ {название товара}\n\n Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
-  { id: 'event', name: '📅 Событие', text: ' Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
-  { id: 'quote', name: ' Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
+  { id: 'product', name: '️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
+  { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
+  { id: 'quote', name: '💬 Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
   { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
 ];
 
@@ -80,7 +83,7 @@ export default function App() {
     if (files.length === 0) return;
 
     if (images.length + files.length > 10) {
-      setSnackbar('️ Можно загрузить максимум 10 фото');
+      setSnackbar('⚠️ Можно загрузить максимум 10 фото');
       setTimeout(() => setSnackbar(null), 3000);
       return;
     }
@@ -122,7 +125,7 @@ export default function App() {
             method: 'photos.getUploadServer',
             params: { 
               group_id: parseInt(cleanGroupId),
-              album_id: 'wall',  // ← Загружаем в альбом "Фото на стене"
+              album_id: PHOTO_ALBUM_ID,  // ← Загружаем в наш альбом!
               access_token: userToken,
               v: '5.131'
             }
@@ -152,7 +155,7 @@ export default function App() {
             method: 'photos.save',
             params: {
               group_id: parseInt(cleanGroupId),
-              album_id: 'wall',
+              album_id: PHOTO_ALBUM_ID,  // ← Сохраняем в наш альбом!
               photo: uploadResult.photo,
               server: uploadResult.server,
               hash: uploadResult.hash,
@@ -189,7 +192,7 @@ export default function App() {
             } : img
           ));
 
-          console.log(`✅ Photo saved: ${savedPhoto.owner_id}_${savedPhoto.id}`);
+          console.log(`✅ Photo saved to album ${PHOTO_ALBUM_ID}: ${savedPhoto.owner_id}_${savedPhoto.id}`);
 
         } catch (uploadError) {
           console.error('❌ Ошибка загрузки фото:', uploadError);
@@ -301,7 +304,7 @@ export default function App() {
     }
 
     if (!SERVICE_TOKEN) {
-      setSnackbar(' Токен не настроен');
+      setSnackbar('❌ Токен не настроен');
       setTimeout(() => setSnackbar(null), 3000);
       return;
     }
@@ -309,7 +312,7 @@ export default function App() {
     const cleanGroupId = groupId.replace('-', '');
 
     try {
-      setSnackbar('⏳ Публикация...');
+      setSnackbar(' Публикация...');
 
       let attachments = '';
       if (images.length > 0) {
@@ -324,7 +327,7 @@ export default function App() {
         });
         
         attachments = photoIds.join(',');
-        console.log('📎 Итоговая строка attachments:', attachments);
+        console.log(' Итоговая строка attachments:', attachments);
       }
 
       const params = {
@@ -362,7 +365,7 @@ export default function App() {
     } catch (e) {
       console.error('❌ Full error при публикации:', e);
       const errorMsg = e.error_data?.error_msg || e.error_data?.error_reason || e.error_msg || 'Неизвестная ошибка';
-      setSnackbar(' Ошибка: ' + errorMsg);
+      setSnackbar('❌ Ошибка: ' + errorMsg);
       setTimeout(() => setSnackbar(null), 5000);
     }
   };
@@ -417,7 +420,7 @@ export default function App() {
         <div style={{ marginBottom: '15px' }}>
           <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileSelect} disabled={uploading || images.length >= 10} style={{ display: 'none' }} id="image-upload" />
           <label htmlFor="image-upload" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: images.length >= 10 ? '#a8b2c1' : uploading ? '#f0ad4e' : '#6c5ce7', color: 'white', borderRadius: '8px', fontSize: '15px', cursor: images.length >= 10 ? 'not-allowed' : 'pointer', fontWeight: '500', transition: 'background 0.2s' }}>
-            {uploading ? '⏳ Загрузка...' : images.length >= 10 ? '📁 Максимум фото' : ' Выбрать фото'}
+            {uploading ? '⏳ Загрузка...' : images.length >= 10 ? '📁 Максимум фото' : '📁 Выбрать фото'}
           </label>
           <span style={{ marginLeft: '12px', fontSize: '13px', color: '#818C99' }}>(JPG, PNG, GIF до 5MB)</span>
         </div>
@@ -480,7 +483,7 @@ export default function App() {
 
       {tags.length > 0 && (
         <div style={{ marginBottom: '15px', padding: '10px 15px', background: '#e8f5e9', borderRadius: '8px', border: '1px solid #4caf50', fontSize: '13px', color: '#2e7d32' }}>
-          <strong>👁️ Будет добавлено в конец поста:</strong>
+          <strong>️ Будет добавлено в конец поста:</strong>
           <div style={{ marginTop: '5px', fontStyle: 'italic' }}>{tags.map(t => `#${t}`).join(' ')}</div>
         </div>
       )}
@@ -495,7 +498,7 @@ export default function App() {
       </button>
 
       {snackbar && (
-        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
+        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('⚠️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
           {snackbar}
         </div>
       )}
