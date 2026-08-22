@@ -6,11 +6,11 @@ const SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
 const TEMPLATES = [
   { id: 'news', name: '📢 Новость', text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
   { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
-  { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
+  { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
   { id: 'article', name: ' Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
   { id: 'product', name: '🛍️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n Для заказа пишите в ЛС\n\n#товар #магазин' },
   { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
-  { id: 'quote', name: '💬 Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
+  { id: 'quote', name: '💬 Цитата', text: ' {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
   { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
 ];
 
@@ -132,7 +132,7 @@ export default function App() {
           
           if (!uploadUrl) throw new Error('Не получен upload_url');
 
-          //  ШАГ 2: Загружаем файл ЧЕРЕЗ VERCEL API (обходим CORS!)
+          // 🔥 ШАГ 2: Загружаем файл ЧЕРЕЗ VERCEL API (обходим CORS!)
           const formData = new FormData();
           formData.append('photo', file);
 
@@ -144,7 +144,7 @@ export default function App() {
           if (!uploadResponse.ok) throw new Error(`Upload failed: ${uploadResponse.status}`);
 
           const uploadResult = await uploadResponse.json();
-          console.log(' Результат загрузки:', uploadResult);
+          console.log('📤 Результат загрузки:', uploadResult);
 
           // Извлекаем данные
           let photoData = uploadResult.photo;
@@ -155,28 +155,17 @@ export default function App() {
             throw new Error(`Неполные данные: photo=${photoData}, server=${server}, hash=${hash}`);
           }
 
-          // 🔥 ШАГ 3: Сохраняем фото через saveWallPhoto с токеном пользователя
-          const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
-            method: 'photos.saveWallPhoto',
-            params: {
-              group_id: parseInt(cleanGroupId),
-              photo: photoData,
-              server: server,
-              hash: hash,
-              access_token: userToken,  // ← Токен пользователя!
-              v: '5.131'
-            }
-          });
-
-          console.log('💾 Сырой ответ photos.saveWallPhoto:', savedResponse);
-
+          // 🔥 ШАГ 3: Сохраняем фото через ПРЯМОЙ HTTP запрос (обходим vkBridge!)
+          const saveUrl = `https://api.vk.com/method/photos.saveWallPhoto?group_id=${cleanGroupId}&photo=${encodeURIComponent(photoData)}&server=${server}&hash=${hash}&access_token=${SERVICE_TOKEN}&v=5.131`;
+          
+          const saveResponse = await fetch(saveUrl);
+          const savedData = await saveResponse.json();
+          
+          console.log(' Прямой HTTP ответ:', savedData);
+          
           let savedPhoto = null;
-          if (savedResponse && savedResponse.response) {
-            savedPhoto = Array.isArray(savedResponse.response) ? savedResponse.response[0] : savedResponse.response;
-          } else if (Array.isArray(savedResponse)) {
-            savedPhoto = savedResponse[0];
-          } else {
-            savedPhoto = savedResponse;
+          if (savedData && savedData.response) {
+            savedPhoto = Array.isArray(savedData.response) ? savedData.response[0] : savedData.response;
           }
 
           console.log('🖼️ Извлечённые данные фото:', savedPhoto);
@@ -226,7 +215,7 @@ export default function App() {
     const cleanTag = tag.trim().toLowerCase().replace(/^#/, '');
     if (!cleanTag) return;
     if (tags.includes(cleanTag)) {
-      setSnackbar('️ Этот тег уже добавлен');
+      setSnackbar('⚠️ Этот тег уже добавлен');
       setTimeout(() => setSnackbar(null), 2000);
       return;
     }
@@ -369,7 +358,7 @@ export default function App() {
     } catch (e) {
       console.error('❌ Full error при публикации:', e);
       const errorMsg = e.error_data?.error_msg || e.error_data?.error_reason || e.error_msg || 'Неизвестная ошибка';
-      setSnackbar(' Ошибка: ' + errorMsg);
+      setSnackbar('❌ Ошибка: ' + errorMsg);
       setTimeout(() => setSnackbar(null), 5000);
     }
   };
@@ -390,13 +379,13 @@ export default function App() {
           {showTemplates ? '🙈 Скрыть шаблоны' : '📋 Выбрать шаблон'}
         </button>
         {(post.text || draftLoaded || tags.length > 0 || images.length > 0) && (
-          <button onClick={clearAll} style={{ padding: '10px 20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>️ Очистить всё</button>
+          <button onClick={clearAll} style={{ padding: '10px 20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>🗑️ Очистить всё</button>
         )}
       </div>
 
       {showTemplates && (
         <div style={{ marginBottom: '20px', padding: '20px', background: '#f8f9fa', borderRadius: '12px', border: '1px solid #e0e0e0' }}>
-          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>📋 Выберите шаблон:</h3>
+          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}> Выберите шаблон:</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
             {TEMPLATES.map((template) => (
               <button key={template.id} onClick={() => loadTemplate(template)} style={{ padding: '15px', background: selectedTemplate?.id === template.id ? '#6c5ce7' : 'white', color: selectedTemplate?.id === template.id ? 'white' : '#333', border: `2px solid ${selectedTemplate?.id === template.id ? '#6c5ce7' : '#e0e0e0'}`, borderRadius: '8px', fontSize: '14px', cursor: 'pointer', textAlign: 'left', fontWeight: selectedTemplate?.id === template.id ? '600' : '400' }}>
@@ -424,7 +413,7 @@ export default function App() {
         <div style={{ marginBottom: '15px' }}>
           <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileSelect} disabled={uploading || images.length >= 10} style={{ display: 'none' }} id="image-upload" />
           <label htmlFor="image-upload" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: images.length >= 10 ? '#a8b2c1' : uploading ? '#f0ad4e' : '#6c5ce7', color: 'white', borderRadius: '8px', fontSize: '15px', cursor: images.length >= 10 ? 'not-allowed' : 'pointer', fontWeight: '500', transition: 'background 0.2s' }}>
-            {uploading ? '⏳ Загрузка...' : images.length >= 10 ? '📁 Максимум фото' : '📁 Выбрать фото'}
+            {uploading ? ' Загрузка...' : images.length >= 10 ? '📁 Максимум фото' : ' Выбрать фото'}
           </label>
           <span style={{ marginLeft: '12px', fontSize: '13px', color: '#818C99' }}>(JPG, PNG, GIF до 5MB)</span>
         </div>
