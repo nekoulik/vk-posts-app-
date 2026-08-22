@@ -4,14 +4,14 @@ import vkBridge from '@vkontakte/vk-bridge';
 const SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
 
 const TEMPLATES = [
-  { id: 'news', name: '📢 Новость', text: ' Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
-  { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
+  { id: 'news', name: '📢 Новость', text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
+  { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
   { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
-  { id: 'article', name: '📝 Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
-  { id: 'product', name: '🛍️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n Для заказа пишите в ЛС\n\n#товар #магазин' },
-  { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n {место}\n\n{описание}\n\n#событие #встреча' },
+  { id: 'article', name: '📝 Статья', text: ' {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
+  { id: 'product', name: '️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
+  { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
   { id: 'quote', name: '💬 Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
-  { id: 'contest', name: ' Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n Приз: {приз}\n\n До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
+  { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
 ];
 
 const POPULAR_TAGS = [
@@ -106,7 +106,7 @@ export default function App() {
 
       for (const file of files) {
         if (file.size > 5 * 1024 * 1024) {
-          setSnackbar(`⚠️ Файл "${file.name}" слишком большой (макс. 5MB)`);
+          setSnackbar(`️ Файл "${file.name}" слишком большой (макс. 5MB)`);
           setTimeout(() => setSnackbar(null), 3000);
           continue;
         }
@@ -155,7 +155,7 @@ export default function App() {
             throw new Error(`Неполные данные: photo=${photoData}, server=${server}, hash=${hash}`);
           }
 
-          // 🔥 ШАГ 3: Сохраняем фото через saveWallPhoto
+          // 🔥 ШАГ 3: Сохраняем фото через saveWallPhoto с токеном группы
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.saveWallPhoto',
             params: {
@@ -163,7 +163,7 @@ export default function App() {
               photo: photoData,
               server: server,
               hash: hash,
-              access_token: userToken,
+              access_token: SERVICE_TOKEN,  // ← Используем токен группы!
               v: '5.131'
             }
           });
@@ -185,7 +185,6 @@ export default function App() {
             throw new Error(`Не удалось получить ID фото. Получено: ${JSON.stringify(savedPhoto)}`);
           }
 
-          // ✅ Используем РЕАЛЬНЫЙ owner_id из ответа VK
           setImages(prev => prev.map(img => 
             img.tempId === tempId ? {
               ...img,
@@ -347,7 +346,7 @@ export default function App() {
         params.attachments = attachments;
       }
 
-      console.log(' ИТОГОВЫЕ ПАРАМЕТРЫ ДЛЯ wall.post:', params);
+      console.log('🚀 ИТОГОВЫЕ ПАРАМЕТРЫ ДЛЯ wall.post:', params);
 
       const response = await vkBridge.send('VKWebAppCallAPIMethod', {
         method: 'wall.post',
@@ -425,7 +424,7 @@ export default function App() {
         <div style={{ marginBottom: '15px' }}>
           <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileSelect} disabled={uploading || images.length >= 10} style={{ display: 'none' }} id="image-upload" />
           <label htmlFor="image-upload" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: images.length >= 10 ? '#a8b2c1' : uploading ? '#f0ad4e' : '#6c5ce7', color: 'white', borderRadius: '8px', fontSize: '15px', cursor: images.length >= 10 ? 'not-allowed' : 'pointer', fontWeight: '500', transition: 'background 0.2s' }}>
-            {uploading ? '⏳ Загрузка...' : images.length >= 10 ? ' Максимум фото' : '📁 Выбрать фото'}
+            {uploading ? '⏳ Загрузка...' : images.length >= 10 ? '📁 Максимум фото' : '📁 Выбрать фото'}
           </label>
           <span style={{ marginLeft: '12px', fontSize: '13px', color: '#818C99' }}>(JPG, PNG, GIF до 5MB)</span>
         </div>
@@ -488,7 +487,7 @@ export default function App() {
 
       {tags.length > 0 && (
         <div style={{ marginBottom: '15px', padding: '10px 15px', background: '#e8f5e9', borderRadius: '8px', border: '1px solid #4caf50', fontSize: '13px', color: '#2e7d32' }}>
-          <strong>️ Будет добавлено в конец поста:</strong>
+          <strong>👁️ Будет добавлено в конец поста:</strong>
           <div style={{ marginTop: '5px', fontStyle: 'italic' }}>{tags.map(t => `#${t}`).join(' ')}</div>
         </div>
       )}
@@ -499,7 +498,7 @@ export default function App() {
       </div>
 
       <button onClick={publishPost} disabled={!post.text.trim() && images.length === 0} style={{ width: '100%', padding: '14px', background: (!post.text.trim() && images.length === 0) ? '#a8b2c1' : '#4a76a8', color: 'white', border: 'none', borderRadius: '8px', fontSize: '17px', fontWeight: '600', cursor: (!post.text.trim() && images.length === 0) ? 'not-allowed' : 'pointer', transition: 'background 0.2s' }}>
-         Опубликовать{images.length > 0 && ` с ${images.length} фото`}{tags.length > 0 && ` и ${tags.length} тег.`}
+        📤 Опубликовать{images.length > 0 && ` с ${images.length} фото`}{tags.length > 0 && ` и ${tags.length} тег.`}
       </button>
 
       {snackbar && (
