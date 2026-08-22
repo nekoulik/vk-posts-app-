@@ -191,7 +191,7 @@ export default function App() {
             params: {
               group_id: parseInt(cleanGroupId),
               album_id: PHOTO_ALBUM_ID,
-              photo: photoData,  // ← Передаём ОБЪЕКТ (распаршенный)!
+              photos_list: photoData,  // ← photos_list, не photo!
               server: server,
               hash: hash,
               access_token: userToken,
