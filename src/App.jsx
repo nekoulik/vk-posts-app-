@@ -4,14 +4,14 @@ import vkBridge from '@vkontakte/vk-bridge';
 const SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
 
 const TEMPLATES = [
-  { id: 'news', name: ' Новость', text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
-  { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
+  { id: 'news', name: '📢 Новость', text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
+  { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
   { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
-  { id: 'article', name: '📝 Статья', text: ' {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
+  { id: 'article', name: '📝 Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
   { id: 'product', name: '️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
-  { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
-  { id: 'quote', name: '💬 Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
-  { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n Приз: {приз}\n\n До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
+  { id: 'event', name: '📅 Событие', text: ' Приглашаем на событие!\n\n{название события}\n\n️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
+  { id: 'quote', name: ' Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
+  { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
 ];
 
 const POPULAR_TAGS = [
@@ -91,7 +91,6 @@ export default function App() {
     try {
       const cleanGroupId = groupId.replace('-', '');
       
-      // 🔥 ВАЖНО: получаем токен пользователя
       let userToken = SERVICE_TOKEN;
       
       try {
@@ -107,7 +106,7 @@ export default function App() {
 
       for (const file of files) {
         if (file.size > 5 * 1024 * 1024) {
-          setSnackbar(`️ Файл "${file.name}" слишком большой (макс. 5MB)`);
+          setSnackbar(`⚠️ Файл "${file.name}" слишком большой (макс. 5MB)`);
           setTimeout(() => setSnackbar(null), 3000);
           continue;
         }
@@ -139,7 +138,7 @@ export default function App() {
           if (!uploadResponse.ok) throw new Error(`Upload failed: ${uploadResponse.status}`);
 
           const uploadResult = await uploadResponse.json();
-          console.log(' Результат загрузки на сервер:', uploadResult);
+          console.log('📤 Результат загрузки на сервер:', uploadResult);
 
           const pPhoto = uploadResult.photo || (uploadResult.response && uploadResult.response.photo);
           const pServer = uploadResult.server || (uploadResult.response && uploadResult.response.server);
@@ -149,15 +148,14 @@ export default function App() {
             throw new Error('Неверный формат ответа от сервера загрузки VK');
           }
 
-          //  ВАЖНО: используем токен пользователя (групповой токен не работает!)
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.saveWallPhoto',
             params: {
-              group_id: parseInt(cleanGroupId),  // ← Указываем группу
+              group_id: parseInt(cleanGroupId),
               photo: pPhoto,
               server: pServer,
               hash: pHash,
-              access_token: userToken,  // ← Токен пользователя (ОБЯЗАТЕЛЬНО!)
+              access_token: userToken,
               v: '5.131'
             }
           });
@@ -179,19 +177,24 @@ export default function App() {
             throw new Error(`Не удалось получить ID фото. Получено: ${JSON.stringify(savedPhoto)}`);
           }
 
+          // 🔥 ИСПРАВЛЕНИЕ: принудительно меняем owner_id на отрицательный (группы)!
+          const groupOwnerId = -parseInt(cleanGroupId);
+
           setImages(prev => prev.map(img => 
             img.tempId === tempId ? {
               ...img,
               id: savedPhoto.id,
-              owner_id: savedPhoto.owner_id,
+              owner_id: groupOwnerId,  // ← ОТРИЦАТЕЛЬНЫЙ ID группы!
               access_key: savedPhoto.access_key || '',
               uploading: false,
               uploaded: true
             } : img
           ));
 
+          console.log(`✅ Photo saved with owner_id: ${groupOwnerId} (was ${savedPhoto.owner_id})`);
+
         } catch (uploadError) {
-          console.error('❌ Ошибка загрузки фото:', uploadError);
+          console.error(' Ошибка загрузки фото:', uploadError);
           const errorMsg = uploadError.error_data?.error_msg || uploadError.error_msg || uploadError.message || 'Неизвестная ошибка';
           setSnackbar(`❌ Не удалось загрузить "${file.name}": ${errorMsg}`);
           setTimeout(() => setSnackbar(null), 4000);
@@ -300,7 +303,7 @@ export default function App() {
     }
 
     if (!SERVICE_TOKEN) {
-      setSnackbar('❌ Токен не настроен');
+      setSnackbar(' Токен не настроен');
       setTimeout(() => setSnackbar(null), 3000);
       return;
     }
@@ -308,7 +311,7 @@ export default function App() {
     const cleanGroupId = groupId.replace('-', '');
 
     try {
-      setSnackbar(' Публикация...');
+      setSnackbar('⏳ Публикация...');
 
       let attachments = '';
       if (images.length > 0) {
@@ -372,14 +375,14 @@ export default function App() {
 
       {draftLoaded && (
         <div style={{ marginBottom: '15px', padding: '12px 15px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px' }}>
-          <span style={{ color: '#856404', fontWeight: '500' }}> Есть сохранённый черновик</span>
-          <button onClick={restoreDraft} style={{ padding: '8px 16px', background: '#ffc107', color: '#856404', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', fontWeight: '600' }}>️ Восстановить</button>
+          <span style={{ color: '#856404', fontWeight: '500' }}>💾 Есть сохранённый черновик</span>
+          <button onClick={restoreDraft} style={{ padding: '8px 16px', background: '#ffc107', color: '#856404', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', fontWeight: '600' }}>♻️ Восстановить</button>
         </div>
       )}
 
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         <button onClick={() => setShowTemplates(!showTemplates)} style={{ padding: '10px 20px', background: '#6c5ce7', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>
-          {showTemplates ? ' Скрыть шаблоны' : '📋 Выбрать шаблон'}
+          {showTemplates ? '🙈 Скрыть шаблоны' : '📋 Выбрать шаблон'}
         </button>
         {(post.text || draftLoaded || tags.length > 0 || images.length > 0) && (
           <button onClick={clearAll} style={{ padding: '10px 20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>🗑️ Очистить всё</button>
@@ -436,7 +439,7 @@ export default function App() {
           </div>
         )}
         {images.length === 0 && (
-          <div style={{ fontSize: '13px', color: '#818C99', textAlign: 'center', padding: '20px', border: '2px dashed #e0e0e0', borderRadius: '8px' }}>📁 Нажмите "Выбрать фото" чтобы добавить изображения</div>
+          <div style={{ fontSize: '13px', color: '#818C99', textAlign: 'center', padding: '20px', border: '2px dashed #e0e0e0', borderRadius: '8px' }}> Нажмите "Выбрать фото" чтобы добавить изображения</div>
         )}
       </div>
 
@@ -479,7 +482,7 @@ export default function App() {
 
       {tags.length > 0 && (
         <div style={{ marginBottom: '15px', padding: '10px 15px', background: '#e8f5e9', borderRadius: '8px', border: '1px solid #4caf50', fontSize: '13px', color: '#2e7d32' }}>
-          <strong>️ Будет добавлено в конец поста:</strong>
+          <strong>👁️ Будет добавлено в конец поста:</strong>
           <div style={{ marginTop: '5px', fontStyle: 'italic' }}>{tags.map(t => `#${t}`).join(' ')}</div>
         </div>
       )}
