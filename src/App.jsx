@@ -142,9 +142,28 @@ export default function App() {
             throw new Error('Не получен upload_url');
           }
 
-          // ШАГ 2: Загружаем через скрытую форму (обходит CORS)
-          const uploadResult = await uploadViaIframe(uploadUrl, file);
+          // ШАГ 2: Загружаем через Vercel API прокси (без CORS!)
+          const formData = new FormData();
+          formData.append('photo', file);
+
+          const uploadResponse = await fetch(
+            `/api/upload?uploadUrl=${encodeURIComponent(uploadUrl)}`,
+            {
+              method: 'POST',
+              body: formData,
+            }
+          );
+
+          if (!uploadResponse.ok) {
+            throw new Error(`Upload failed: ${uploadResponse.status}`);
+          }
+
+          const uploadResult = await uploadResponse.json();
           console.log('Upload result:', uploadResult);
+
+          if (!uploadResult.photo || !uploadResult.server || !uploadResult.hash) {
+            throw new Error('Invalid upload response from VK');
+          }
 
           // ШАГ 3: Сохраняем фото
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
