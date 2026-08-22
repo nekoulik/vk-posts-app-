@@ -4,7 +4,7 @@ import vkBridge from '@vkontakte/vk-bridge';
 const SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
 
 const TEMPLATES = [
-  { id: 'news', name: '📢 Новость', text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
+  { id: 'news', name: ' Новость', text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
   { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
   { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
   { id: 'article', name: '📝 Статья', text: ' {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
@@ -91,23 +91,23 @@ export default function App() {
     try {
       const cleanGroupId = groupId.replace('-', '');
       
-      // 🔥 ВАЖНО: для getWallUploadServer нужен токен пользователя
-      let uploadToken = SERVICE_TOKEN;
+      // 🔥 ВАЖНО: получаем токен пользователя
+      let userToken = SERVICE_TOKEN;
       
       try {
         const tokenResponse = await vkBridge.send('VKWebAppGetAuthToken', {
           app_id: 54729099,
           scope: 'photos,wall'
         });
-        uploadToken = tokenResponse.access_token;
-        console.log('✅ Получили токен пользователя для загрузки');
+        userToken = tokenResponse.access_token;
+        console.log('✅ Получили токен пользователя');
       } catch (tokenError) {
         console.warn('Не удалось получить токен пользователя, используем сервисный:', tokenError);
       }
 
       for (const file of files) {
         if (file.size > 5 * 1024 * 1024) {
-          setSnackbar(`⚠️ Файл "${file.name}" слишком большой (макс. 5MB)`);
+          setSnackbar(`️ Файл "${file.name}" слишком большой (макс. 5MB)`);
           setTimeout(() => setSnackbar(null), 3000);
           continue;
         }
@@ -120,7 +120,7 @@ export default function App() {
         try {
           const uploadServerResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.getWallUploadServer',
-            params: { group_id: cleanGroupId, access_token: uploadToken, v: '5.131' }
+            params: { group_id: cleanGroupId, access_token: userToken, v: '5.131' }
           });
 
           const uploadData = uploadServerResponse.response || uploadServerResponse;
@@ -139,7 +139,7 @@ export default function App() {
           if (!uploadResponse.ok) throw new Error(`Upload failed: ${uploadResponse.status}`);
 
           const uploadResult = await uploadResponse.json();
-          console.log('📤 Результат загрузки на сервер:', uploadResult);
+          console.log(' Результат загрузки на сервер:', uploadResult);
 
           const pPhoto = uploadResult.photo || (uploadResult.response && uploadResult.response.photo);
           const pServer = uploadResult.server || (uploadResult.response && uploadResult.response.server);
@@ -149,15 +149,15 @@ export default function App() {
             throw new Error('Неверный формат ответа от сервера загрузки VK');
           }
 
-          // 🔥 ВАЖНО: для saveWallPhoto используем SERVICE_TOKEN (токен группы)!
+          //  ВАЖНО: используем токен пользователя (групповой токен не работает!)
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.saveWallPhoto',
             params: {
-              group_id: parseInt(cleanGroupId),  // ← ПОЛОЖИТЕЛЬНЫЙ ID!
+              group_id: parseInt(cleanGroupId),  // ← Указываем группу
               photo: pPhoto,
               server: pServer,
               hash: pHash,
-              access_token: SERVICE_TOKEN,  // ← ТОКЕН ГРУППЫ!
+              access_token: userToken,  // ← Токен пользователя (ОБЯЗАТЕЛЬНО!)
               v: '5.131'
             }
           });
@@ -193,7 +193,7 @@ export default function App() {
         } catch (uploadError) {
           console.error('❌ Ошибка загрузки фото:', uploadError);
           const errorMsg = uploadError.error_data?.error_msg || uploadError.error_msg || uploadError.message || 'Неизвестная ошибка';
-          setSnackbar(` Не удалось загрузить "${file.name}": ${errorMsg}`);
+          setSnackbar(`❌ Не удалось загрузить "${file.name}": ${errorMsg}`);
           setTimeout(() => setSnackbar(null), 4000);
           setImages(prev => prev.filter(img => img.tempId !== tempId));
         }
@@ -308,7 +308,7 @@ export default function App() {
     const cleanGroupId = groupId.replace('-', '');
 
     try {
-      setSnackbar('⏳ Публикация...');
+      setSnackbar(' Публикация...');
 
       let attachments = '';
       if (images.length > 0) {
@@ -359,7 +359,7 @@ export default function App() {
       setSelectedTemplate(null);
       setTimeout(() => setSnackbar(null), 3000);
     } catch (e) {
-      console.error(' Full error при публикации:', e);
+      console.error('❌ Full error при публикации:', e);
       const errorMsg = e.error_data?.error_msg || e.error_data?.error_reason || e.error_msg || 'Неизвестная ошибка';
       setSnackbar('❌ Ошибка: ' + errorMsg);
       setTimeout(() => setSnackbar(null), 5000);
@@ -372,14 +372,14 @@ export default function App() {
 
       {draftLoaded && (
         <div style={{ marginBottom: '15px', padding: '12px 15px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px' }}>
-          <span style={{ color: '#856404', fontWeight: '500' }}>💾 Есть сохранённый черновик</span>
-          <button onClick={restoreDraft} style={{ padding: '8px 16px', background: '#ffc107', color: '#856404', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', fontWeight: '600' }}>♻️ Восстановить</button>
+          <span style={{ color: '#856404', fontWeight: '500' }}> Есть сохранённый черновик</span>
+          <button onClick={restoreDraft} style={{ padding: '8px 16px', background: '#ffc107', color: '#856404', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', fontWeight: '600' }}>️ Восстановить</button>
         </div>
       )}
 
       <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
         <button onClick={() => setShowTemplates(!showTemplates)} style={{ padding: '10px 20px', background: '#6c5ce7', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>
-          {showTemplates ? '🙈 Скрыть шаблоны' : '📋 Выбрать шаблон'}
+          {showTemplates ? ' Скрыть шаблоны' : '📋 Выбрать шаблон'}
         </button>
         {(post.text || draftLoaded || tags.length > 0 || images.length > 0) && (
           <button onClick={clearAll} style={{ padding: '10px 20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>🗑️ Очистить всё</button>
@@ -388,7 +388,7 @@ export default function App() {
 
       {showTemplates && (
         <div style={{ marginBottom: '20px', padding: '20px', background: '#f8f9fa', borderRadius: '12px', border: '1px solid #e0e0e0' }}>
-          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}> Выберите шаблон:</h3>
+          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>📋 Выберите шаблон:</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
             {TEMPLATES.map((template) => (
               <button key={template.id} onClick={() => loadTemplate(template)} style={{ padding: '15px', background: selectedTemplate?.id === template.id ? '#6c5ce7' : 'white', color: selectedTemplate?.id === template.id ? 'white' : '#333', border: `2px solid ${selectedTemplate?.id === template.id ? '#6c5ce7' : '#e0e0e0'}`, borderRadius: '8px', fontSize: '14px', cursor: 'pointer', textAlign: 'left', fontWeight: selectedTemplate?.id === template.id ? '600' : '400' }}>
@@ -416,7 +416,7 @@ export default function App() {
         <div style={{ marginBottom: '15px' }}>
           <input ref={fileInputRef} type="file" accept="image/*" multiple onChange={handleFileSelect} disabled={uploading || images.length >= 10} style={{ display: 'none' }} id="image-upload" />
           <label htmlFor="image-upload" style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 20px', background: images.length >= 10 ? '#a8b2c1' : uploading ? '#f0ad4e' : '#6c5ce7', color: 'white', borderRadius: '8px', fontSize: '15px', cursor: images.length >= 10 ? 'not-allowed' : 'pointer', fontWeight: '500', transition: 'background 0.2s' }}>
-            {uploading ? '⏳ Загрузка...' : images.length >= 10 ? '📁 Максимум фото' : '📁 Выбрать фото'}
+            {uploading ? '⏳ Загрузка...' : images.length >= 10 ? '📁 Максимум фото' : ' Выбрать фото'}
           </label>
           <span style={{ marginLeft: '12px', fontSize: '13px', color: '#818C99' }}>(JPG, PNG, GIF до 5MB)</span>
         </div>
@@ -479,7 +479,7 @@ export default function App() {
 
       {tags.length > 0 && (
         <div style={{ marginBottom: '15px', padding: '10px 15px', background: '#e8f5e9', borderRadius: '8px', border: '1px solid #4caf50', fontSize: '13px', color: '#2e7d32' }}>
-          <strong>👁️ Будет добавлено в конец поста:</strong>
+          <strong>️ Будет добавлено в конец поста:</strong>
           <div style={{ marginTop: '5px', fontStyle: 'italic' }}>{tags.map(t => `#${t}`).join(' ')}</div>
         </div>
       )}
