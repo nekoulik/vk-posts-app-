@@ -5,13 +5,13 @@ const SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
 
 const TEMPLATES = [
   { id: 'news', name: '📢 Новость', text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
-  { id: 'promo', name: '🎉 Акция', text: ' АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
-  { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
-  { id: 'article', name: '📝 Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
-  { id: 'product', name: '️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
-  { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
-  { id: 'quote', name: '💬 Цитата', text: ' {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
-  { id: 'contest', name: '🏆 Конкурс', text: ' КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
+  { id: 'promo', name: ' Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
+  { id: 'question', name: '❓ Вопрос', text: ' Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
+  { id: 'article', name: '📝 Статья', text: ' {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
+  { id: 'product', name: '🛍️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
+  { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n {место}\n\n{описание}\n\n#событие #встреча' },
+  { id: 'quote', name: '💬 Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
+  { id: 'contest', name: ' Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n Приз: {приз}\n\n До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
 ];
 
 const POPULAR_TAGS = [
@@ -148,11 +148,11 @@ export default function App() {
             throw new Error('Неверный формат ответа от сервера загрузки VK');
           }
 
-          // 🔥 ИСПРАВЛЕНИЕ: передаём ОТРИЦАТЕЛЬНЫЙ group_id!
+          // 🔥 ВАЖНО: передаём ОТРИЦАТЕЛЬНЫЙ group_id, чтобы фото сохранилось в альбоме группы
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.saveWallPhoto',
             params: {
-              group_id: -parseInt(cleanGroupId),
+              group_id: -parseInt(cleanGroupId),  // ← ОТРИЦАТЕЛЬНЫЙ!
               photo: pPhoto,
               server: pServer,
               hash: pHash,
@@ -172,7 +172,7 @@ export default function App() {
             savedPhoto = savedResponse;
           }
 
-          console.log('🖼️ Извлечённые данные фото:', savedPhoto);
+          console.log('️ Извлечённые данные фото:', savedPhoto);
 
           if (!savedPhoto || !savedPhoto.id || !savedPhoto.owner_id) {
             throw new Error(`Не удалось получить ID фото. Получено: ${JSON.stringify(savedPhoto)}`);
@@ -325,19 +325,23 @@ export default function App() {
         console.log('📎 Итоговая строка attachments:', attachments);
       }
 
+      // 🔥 ВАЖНО: не передаём message если он пустой, иначе VK вернёт ошибку
       const params = {
         owner_id: -parseInt(cleanGroupId),
-        message: finalText,
         from_group: 1,
         access_token: SERVICE_TOKEN,
         v: '5.131'
       };
 
+      if (finalText.trim()) {
+        params.message = finalText;
+      }
+
       if (attachments) {
         params.attachments = attachments;
       }
 
-      console.log(' ИТОГОВЫЕ ПАРАМЕТРЫ ДЛЯ wall.post:', params);
+      console.log('🚀 ИТОГОВЫЕ ПАРАМЕТРЫ ДЛЯ wall.post:', params);
 
       const response = await vkBridge.send('VKWebAppCallAPIMethod', {
         method: 'wall.post',
@@ -372,7 +376,7 @@ export default function App() {
       {draftLoaded && (
         <div style={{ marginBottom: '15px', padding: '12px 15px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px' }}>
           <span style={{ color: '#856404', fontWeight: '500' }}>💾 Есть сохранённый черновик</span>
-          <button onClick={restoreDraft} style={{ padding: '8px 16px', background: '#ffc107', color: '#856404', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', fontWeight: '600' }}>️ Восстановить</button>
+          <button onClick={restoreDraft} style={{ padding: '8px 16px', background: '#ffc107', color: '#856404', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', fontWeight: '600' }}>♻️ Восстановить</button>
         </div>
       )}
 
@@ -387,7 +391,7 @@ export default function App() {
 
       {showTemplates && (
         <div style={{ marginBottom: '20px', padding: '20px', background: '#f8f9fa', borderRadius: '12px', border: '1px solid #e0e0e0' }}>
-          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}>📋 Выберите шаблон:</h3>
+          <h3 style={{ marginBottom: '15px', fontSize: '18px' }}> Выберите шаблон:</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '12px' }}>
             {TEMPLATES.map((template) => (
               <button key={template.id} onClick={() => loadTemplate(template)} style={{ padding: '15px', background: selectedTemplate?.id === template.id ? '#6c5ce7' : 'white', color: selectedTemplate?.id === template.id ? 'white' : '#333', border: `2px solid ${selectedTemplate?.id === template.id ? '#6c5ce7' : '#e0e0e0'}`, borderRadius: '8px', fontSize: '14px', cursor: 'pointer', textAlign: 'left', fontWeight: selectedTemplate?.id === template.id ? '600' : '400' }}>
