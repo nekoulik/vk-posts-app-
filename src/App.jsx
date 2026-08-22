@@ -3,14 +3,11 @@ import vkBridge from '@vkontakte/vk-bridge';
 
 const SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
 
-// 🔥 ID альбома для загрузки фото
-const PHOTO_ALBUM_ID = '312101029';
-
 const TEMPLATES = [
   { id: 'news', name: '📢 Новость', text: '📢 Важная новость!\n\n{заголовок}\n\n{описание}\n\n#новости #важно' },
   { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
   { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
-  { id: 'article', name: '📝 Статья', text: ' {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
+  { id: 'article', name: '📝 Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
   { id: 'product', name: '️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
   { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
   { id: 'quote', name: '💬 Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
@@ -83,7 +80,7 @@ export default function App() {
     if (files.length === 0) return;
 
     if (images.length + files.length > 10) {
-      setSnackbar('️ Можно загрузить максимум 10 фото');
+      setSnackbar('⚠️ Можно загрузить максимум 10 фото');
       setTimeout(() => setSnackbar(null), 3000);
       return;
     }
@@ -109,7 +106,7 @@ export default function App() {
 
       for (const file of files) {
         if (file.size > 5 * 1024 * 1024) {
-          setSnackbar(`️ Файл "${file.name}" слишком большой (макс. 5MB)`);
+          setSnackbar(`⚠️ Файл "${file.name}" слишком большой (макс. 5MB)`);
           setTimeout(() => setSnackbar(null), 3000);
           continue;
         }
@@ -120,12 +117,11 @@ export default function App() {
         setImages(prev => [...prev, { tempId, url: previewUrl, uploading: true }]);
 
         try {
-          // 🔥 ШАГ 1: Получаем URL для загрузки в альбом группы
+          // 🔥 ШАГ 1: Получаем URL для загрузки на стену группы
           const uploadServerResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
-            method: 'photos.getUploadServer',
+            method: 'photos.getWallUploadServer',
             params: { 
-              group_id: parseInt(cleanGroupId),
-              album_id: PHOTO_ALBUM_ID,
+              group_id: cleanGroupId,
               access_token: userToken,
               v: '5.131'
             }
@@ -148,50 +144,23 @@ export default function App() {
           if (!uploadResponse.ok) throw new Error(`Upload failed: ${uploadResponse.status}`);
 
           const uploadResult = await uploadResponse.json();
-          console.log('📤 Полный ответ от Vercel API:', uploadResult);
-          console.log('Ключи в ответе:', Object.keys(uploadResult));
+          console.log('📤 Результат загрузки:', uploadResult);
 
-          // 🔥 ШАГ 3: Извлекаем данные
-          // VK возвращает: { aid, gid, hash, photos_list, server }
-          let photoData = uploadResult.photos_list;  // ← СТРОКА JSON
+          // Извлекаем данные
+          let photoData = uploadResult.photo;
           let server = uploadResult.server;
           let hash = uploadResult.hash;
 
-          console.log('📦 Извлечённые данные:');
-          console.log('  photos_list (строка):', photoData);
-          console.log('  server:', server);
-          console.log('  hash:', hash);
-
           if (!photoData || !server || !hash) {
-            throw new Error(`Неполные данные от сервера: photos_list=${photoData}, server=${server}, hash=${hash}`);
+            throw new Error(`Неполные данные: photo=${photoData}, server=${server}, hash=${hash}`);
           }
 
-          // Парсим photos_list
-          if (typeof photoData === 'string') {
-            try {
-              const parsed = JSON.parse(photoData);
-              console.log('✅ Распарсили photos_list из JSON:', parsed);
-              
-              // photos_list — это массив, берём первый элемент
-              if (Array.isArray(parsed) && parsed.length > 0) {
-                photoData = parsed[0];
-                console.log('📦 Берём первый элемент массива:', photoData);
-              }
-            } catch (e) {
-              console.error('❌ Не удалось распарсить photos_list:', e);
-            }
-          }
-
-          // 🔥 ШАГ 4: Сохраняем фото
-          // ВАЖНО: передаём распаршенный ОБЪЕКТ, не строку!
-          console.log('🚀 Отправляем photos.save с photoData как объектом...');
-          
+          // 🔥 ШАГ 3: Сохраняем фото через saveWallPhoto
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
-            method: 'photos.save',
+            method: 'photos.saveWallPhoto',
             params: {
               group_id: parseInt(cleanGroupId),
-              album_id: PHOTO_ALBUM_ID,
-              photos_list: photoData,  // ← photos_list, не photo!
+              photo: photoData,
               server: server,
               hash: hash,
               access_token: userToken,
@@ -199,7 +168,7 @@ export default function App() {
             }
           });
 
-          console.log('💾 Сырой ответ photos.save:', savedResponse);
+          console.log('💾 Сырой ответ photos.saveWallPhoto:', savedResponse);
 
           let savedPhoto = null;
           if (savedResponse && savedResponse.response) {
@@ -216,18 +185,21 @@ export default function App() {
             throw new Error(`Не удалось получить ID фото. Получено: ${JSON.stringify(savedPhoto)}`);
           }
 
+          // 🔥 ВАЖНО: принудительно меняем owner_id на отрицательный (группы)!
+          const groupOwnerId = -parseInt(cleanGroupId);
+
           setImages(prev => prev.map(img => 
             img.tempId === tempId ? {
               ...img,
               id: savedPhoto.id,
-              owner_id: savedPhoto.owner_id,
+              owner_id: groupOwnerId,
               access_key: savedPhoto.access_key || '',
               uploading: false,
               uploaded: true
             } : img
           ));
 
-          console.log(`✅ Фото сохранено в альбом ${PHOTO_ALBUM_ID}: ${savedPhoto.owner_id}_${savedPhoto.id}`);
+          console.log(`✅ Фото сохранено: ${groupOwnerId}_${savedPhoto.id} (было ${savedPhoto.owner_id}_${savedPhoto.id})`);
 
         } catch (uploadError) {
           console.error('❌ Ошибка загрузки фото:', uploadError);
@@ -239,7 +211,7 @@ export default function App() {
       }
     } catch (error) {
       console.error('Ошибка:', error);
-      setSnackbar('❌ Ошибка при загрузке фото: ' + error.message);
+      setSnackbar(' Ошибка при загрузке фото: ' + error.message);
       setTimeout(() => setSnackbar(null), 5000);
     } finally {
       setUploading(false);
@@ -300,7 +272,7 @@ export default function App() {
     setShowTemplates(true);
     localStorage.removeItem(DRAFT_KEY);
     setDraftLoaded(false);
-    setSnackbar('🗑️ Черновик удалён');
+    setSnackbar('️ Черновик удалён');
     setTimeout(() => setSnackbar(null), 3000);
   };
 
@@ -347,7 +319,7 @@ export default function App() {
     const cleanGroupId = groupId.replace('-', '');
 
     try {
-      setSnackbar(' Публикация...');
+      setSnackbar('⏳ Публикация...');
 
       let attachments = '';
       if (images.length > 0) {
@@ -377,7 +349,7 @@ export default function App() {
         params.attachments = attachments;
       }
 
-      console.log('🚀 ИТОГОВЫЕ ПАРАМЕТРЫ ДЛЯ wall.post:', params);
+      console.log(' ИТОГОВЫЕ ПАРАМЕТРЫ ДЛЯ wall.post:', params);
 
       const response = await vkBridge.send('VKWebAppCallAPIMethod', {
         method: 'wall.post',
@@ -411,7 +383,7 @@ export default function App() {
 
       {draftLoaded && (
         <div style={{ marginBottom: '15px', padding: '12px 15px', background: '#fff3cd', border: '1px solid #ffc107', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '14px' }}>
-          <span style={{ color: '#856404', fontWeight: '500' }}>💾 Есть сохранённый черновик</span>
+          <span style={{ color: '#856404', fontWeight: '500' }}> Есть сохранённый черновик</span>
           <button onClick={restoreDraft} style={{ padding: '8px 16px', background: '#ffc107', color: '#856404', border: 'none', borderRadius: '6px', fontSize: '14px', cursor: 'pointer', fontWeight: '600' }}>♻️ Восстановить</button>
         </div>
       )}
@@ -533,7 +505,7 @@ export default function App() {
       </button>
 
       {snackbar && (
-        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
+        <div style={{ position: 'fixed', bottom: '20px', left: '50%', transform: 'translateX(-50%)', padding: '14px 28px', background: snackbar.includes('✅') ? '#4CAF50' : snackbar.includes('⚠️') ? '#FF9800' : '#f44336', color: 'white', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', fontSize: '15px', zIndex: 1000, textAlign: 'center', minWidth: '300px', fontWeight: '500' }}>
           {snackbar}
         </div>
       )}
