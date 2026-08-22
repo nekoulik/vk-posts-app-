@@ -3,7 +3,7 @@ import vkBridge from '@vkontakte/vk-bridge';
 
 const SERVICE_TOKEN = import.meta.env.VITE_SERVICE_TOKEN;
 
-// 🔥 ID альбома для загрузки фото (создан вами ранее)
+// 🔥 ID альбома для загрузки фото
 const PHOTO_ALBUM_ID = '312101029';
 
 const TEMPLATES = [
@@ -11,10 +11,10 @@ const TEMPLATES = [
   { id: 'promo', name: '🎉 Акция', text: '🎉 АКЦИЯ!\n\n{название акции}\n\n📅 С {дата начала} по {дата конца}\n\n{условия}\n\n#акция #скидки' },
   { id: 'question', name: '❓ Вопрос', text: '❓ Вопрос к аудитории:\n\n{текст вопроса}\n\n✍️ Делитесь мнением в комментариях!\n\n#опрос #вопрос' },
   { id: 'article', name: '📝 Статья', text: '📝 {заголовок статьи}\n\n{вступление}\n\n---\n\n{основной текст}\n\n---\n\n{заключение}\n\n#статья' },
-  { id: 'product', name: '🛍️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
-  { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n⏰ {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
+  { id: 'product', name: '️ Товар', text: '🛍️ {название товара}\n\n💰 Цена: {цена}\n\n📦 {описание}\n\n📩 Для заказа пишите в ЛС\n\n#товар #магазин' },
+  { id: 'event', name: '📅 Событие', text: '📅 Приглашаем на событие!\n\n{название события}\n\n🗓️ {дата}\n {время}\n📍 {место}\n\n{описание}\n\n#событие #встреча' },
   { id: 'quote', name: '💬 Цитата', text: '💭 {текст цитаты}\n\n— {автор}\n\n#цитата #мудрость' },
-  { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n🎁 Приз: {приз}\n\n⏰ До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
+  { id: 'contest', name: '🏆 Конкурс', text: '🏆 КОНКУРС!\n\n{описание конкурса}\n\n Приз: {приз}\n\n До {дата окончания}\n\nУсловия:\n{условия участия}\n\n#конкурс #розыгрыш' }
 ];
 
 const POPULAR_TAGS = [
@@ -120,12 +120,12 @@ export default function App() {
         setImages(prev => [...prev, { tempId, url: previewUrl, uploading: true }]);
 
         try {
-          // 🔥 ШАГ 1: Получаем URL для загрузки в конкретный альбом группы
+          // 🔥 ШАГ 1: Получаем URL для загрузки в альбом группы
           const uploadServerResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.getUploadServer',
             params: { 
               group_id: parseInt(cleanGroupId),
-              album_id: PHOTO_ALBUM_ID, 
+              album_id: PHOTO_ALBUM_ID,
               access_token: userToken,
               v: '5.131'
             }
@@ -136,7 +136,7 @@ export default function App() {
           
           if (!uploadUrl) throw new Error('Не получен upload_url');
 
-          // 🔥 ШАГ 2: Загружаем файл ЧЕРЕЗ VERCEL API (это обходит ошибку CORS!)
+          // 🔥 ШАГ 2: Загружаем файл ЧЕРЕЗ VERCEL API (обходим CORS!)
           const formData = new FormData();
           formData.append('photo', file);
 
@@ -148,15 +148,25 @@ export default function App() {
           if (!uploadResponse.ok) throw new Error(`Upload failed: ${uploadResponse.status}`);
 
           const uploadResult = await uploadResponse.json();
-          console.log('📤 Результат загрузки на сервер:', uploadResult);
+          console.log(' Результат загрузки на сервер:', uploadResult);
 
           // 🔥 ШАГ 3: Сохраняем фото в альбоме группы
+          // Парсим photo, если он пришёл как строка
+          let photoParam = uploadResult.photo;
+          if (typeof photoParam === 'string') {
+            try {
+              photoParam = JSON.parse(photoParam);
+            } catch (e) {
+              // Если не JSON, оставляем как есть
+            }
+          }
+
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.save',
             params: {
               group_id: parseInt(cleanGroupId),
               album_id: PHOTO_ALBUM_ID,
-              photo: uploadResult.photo,
+              photo: Array.isArray(photoParam) ? photoParam[0] : photoParam,
               server: uploadResult.server,
               hash: uploadResult.hash,
               access_token: userToken,
@@ -164,7 +174,7 @@ export default function App() {
             }
           });
 
-          console.log('💾 Сырой ответ photos.save:', savedResponse);
+          console.log(' Сырой ответ photos.save:', savedResponse);
 
           let savedPhoto = null;
           if (savedResponse && savedResponse.response) {
@@ -365,7 +375,7 @@ export default function App() {
     } catch (e) {
       console.error('❌ Full error при публикации:', e);
       const errorMsg = e.error_data?.error_msg || e.error_data?.error_reason || e.error_msg || 'Неизвестная ошибка';
-      setSnackbar('❌ Ошибка: ' + errorMsg);
+      setSnackbar(' Ошибка: ' + errorMsg);
       setTimeout(() => setSnackbar(null), 5000);
     }
   };
@@ -386,7 +396,7 @@ export default function App() {
           {showTemplates ? '🙈 Скрыть шаблоны' : '📋 Выбрать шаблон'}
         </button>
         {(post.text || draftLoaded || tags.length > 0 || images.length > 0) && (
-          <button onClick={clearAll} style={{ padding: '10px 20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>🗑️ Очистить всё</button>
+          <button onClick={clearAll} style={{ padding: '10px 20px', background: '#e74c3c', color: 'white', border: 'none', borderRadius: '8px', fontSize: '15px', cursor: 'pointer', fontWeight: '500' }}>️ Очистить всё</button>
         )}
       </div>
 
