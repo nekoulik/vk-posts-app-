@@ -156,9 +156,7 @@ export default function App() {
           }
 
           // 🔥 ШАГ 3: Сохраняем фото через ПРЯМОЙ HTTP запрос (обходим vkBridge!)
-          const saveUrl = `https://api.vk.com/method/photos.saveWallPhoto?group_id=${cleanGroupId}&photo=${encodeURIComponent(photoData)}&server=${server}&hash=${hash}&access_token=${SERVICE_TOKEN}&v=5.131`;
-          
-          const saveResponse = await fetch(saveUrl);
+          const saveResponse = await fetch(`/api/savePhoto?group_id=${cleanGroupId}&photo=${encodeURIComponent(photoData)}&server=${server}&hash=${hash}&access_token=${userToken}&v=5.131`);
           const savedData = await saveResponse.json();
           
           console.log(' Прямой HTTP ответ:', savedData);
