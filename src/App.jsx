@@ -75,12 +75,14 @@ export default function App() {
     }
   }, [post.text, groupId, tags, images]);
 
+  // ... (начало файла такое же, как в предыдущем ответе)
+
   const handleFileSelect = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
 
     if (images.length + files.length > 10) {
-      setSnackbar('⚠️ Можно загрузить максимум 10 фото');
+      setSnackbar('️ Можно загрузить максимум 10 фото');
       setTimeout(() => setSnackbar(null), 3000);
       return;
     }
@@ -91,9 +93,19 @@ export default function App() {
     try {
       const cleanGroupId = groupId.replace('-', '');
       
-      // 🔥 ИСПРАВЛЕНИЕ: Используем токен группы, а не пользователя!
-      const userToken = SERVICE_TOKEN;
-      console.log('✅ Используем токен группы для загрузки фото');
+      // 🔥 Получаем токен пользователя (ОБЯЗАТЕЛЬНО для photos.getWallUploadServer!)
+      let userToken = SERVICE_TOKEN;
+      
+      try {
+        const tokenResponse = await vkBridge.send('VKWebAppGetAuthToken', {
+          app_id: 54729099,
+          scope: 'photos,wall'
+        });
+        userToken = tokenResponse.access_token;
+        console.log('✅ Получили токен пользователя');
+      } catch (tokenError) {
+        console.warn('Не удалось получить токен пользователя, используем сервисный:', tokenError);
+      }
 
       for (const file of files) {
         if (file.size > 5 * 1024 * 1024) {
@@ -139,19 +151,20 @@ export default function App() {
             throw new Error('Неверный формат ответа от сервера загрузки VK');
           }
 
+          // 🔥 Важно: передаём group_id как число!
           const savedResponse = await vkBridge.send('VKWebAppCallAPIMethod', {
             method: 'photos.saveWallPhoto',
             params: {
-              group_id: cleanGroupId,
+              group_id: parseInt(cleanGroupId),  // ← Число, не строка!
               photo: pPhoto,
               server: pServer,
               hash: pHash,
-              access_token: userToken,
+              access_token: userToken,  // ← Токен пользователя!
               v: '5.131'
             }
           });
 
-          console.log('💾 Сырой ответ saveWallPhoto:', savedResponse);
+          console.log(' Сырой ответ saveWallPhoto:', savedResponse);
 
           let savedPhoto = null;
           if (savedResponse && savedResponse.response) {
@@ -196,6 +209,8 @@ export default function App() {
       if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
+
+// ... (остальной код без изменений)
 
   const removeImage = (index) => {
     const img = images[index];
